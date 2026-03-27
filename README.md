@@ -8,6 +8,8 @@
 [![License](https://img.shields.io/badge/License-MIT-4DA6FF?style=flat-square)](LICENSE)
 [![Built with Bubble Tea](https://img.shields.io/badge/TUI-Bubble%20Tea-FF75B7?style=flat-square)](https://github.com/charmbracelet/bubbletea)
 
+**[한국어 문서 (Korean)](README.ko.md)**
+
 </div>
 
 ---
