@@ -46,6 +46,9 @@ type dataMsg struct {
 
 // Model is the entire application state.
 type Model struct {
+	// Build-time version string (e.g. "v0.2.3")
+	version string
+
 	// Docker connection (real or demo)
 	docker docker.DockerClient
 
@@ -92,11 +95,12 @@ func (m Model) Init() tea.Cmd {
 }
 
 // newModel creates the initial Model. Accepts any DockerClient (real or demo).
-func newModel(dc docker.DockerClient) Model {
+func newModel(dc docker.DockerClient, version string) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 
 	return Model{
+		version:     version,
 		docker:      dc,
 		activePanel: PanelContainers,
 		activeView:  ViewDashboard,

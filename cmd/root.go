@@ -27,7 +27,7 @@ Run with --demo to preview the dashboard without a running Docker daemon.`,
   dockviz --demo    # run with simulated data (no Docker required)
   dockviz --version # print version and exit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return tui.Start(demoMode)
+		return tui.Start(demoMode, cmd.Version)
 	},
 }
 
