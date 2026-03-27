@@ -9,11 +9,18 @@ import (
 	"github.com/yourusername/dockviz-cli/internal/docker"
 )
 
-// Start connects to Docker, builds the initial model, and runs the TUI event loop.
-func Start() error {
-	dc, err := docker.NewClient()
-	if err != nil {
-		return fmt.Errorf("docker: %w", err)
+// Start connects to Docker (or uses demo data), builds the model, and runs the TUI.
+// Pass demo=true to run without a live Docker daemon.
+func Start(demo bool) error {
+	var dc docker.DockerClient
+	if demo {
+		dc = docker.NewDemoClient()
+	} else {
+		real, err := docker.NewClient()
+		if err != nil {
+			return fmt.Errorf("docker: %w", err)
+		}
+		dc = real
 	}
 	defer dc.Close()
 
