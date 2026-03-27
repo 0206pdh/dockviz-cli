@@ -28,14 +28,27 @@ Run `dockviz --demo` to try it right now without Docker.
 - **Detail view** — per-container info (ID, image, ports, status)
 - **Demo mode** — `--demo` flag runs with simulated data, no Docker required
 
-## Quick Start
+## Installation
 
-### Prerequisites
+### Linux / VM — one-liner (no Go required)
 
-- [Go 1.22+](https://go.dev/dl/)
-- Docker Desktop or Docker Engine *(not required for `--demo`)*
+```bash
+curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-amd64 \
+  -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
+```
 
-### Install from source
+### macOS — one-liner
+
+```bash
+curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-amd64 \
+  -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
+```
+
+### Windows
+
+Download `dockviz-windows-amd64.exe` from the [Releases page](https://github.com/0206pdh/dockviz-cli/releases/latest).
+
+### Build from source
 
 ```bash
 git clone https://github.com/0206pdh/dockviz-cli.git
@@ -43,14 +56,29 @@ cd dockviz-cli
 go build -o dockviz .
 ```
 
+### go install
+
+```bash
+go install github.com/0206pdh/dockviz-cli@latest
+```
+
+## Quick Start
+
+### Prerequisites
+
+- Docker Engine running *(not required for `--demo`)*
+
 ### Run
 
 ```bash
 # Connect to your local Docker daemon
-./dockviz
+dockviz
 
 # Preview with simulated data — no Docker required
-./dockviz --demo
+dockviz --demo
+
+# Pull an image with live layer progress
+dockviz pull nginx:alpine
 ```
 
 ## Keyboard Shortcuts
