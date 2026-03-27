@@ -145,19 +145,24 @@ func (m Model) renderActivePanel() string {
 }
 
 // renderContainers builds the container list table.
-// Columns: cursor | NAME | GRAPH (sparkline) | CPU | MEM | STATUS | PORTS
+// Column widths (display chars): cursor=2 | NAME=20 | GRAPH=10 | CPU=8 | MEM=8 | STATUS=12 | PORTS=18
+// ANSI-coloured columns (GRAPH, STATUS) are pre-padded to their target width BEFORE
+// wrapping in a colour style, so fmt.Sprintf sees only the plain-text width.
 func (m Model) renderContainers() string {
+	// Header prefix is 2 spaces to match the 2-char cursor field in each row.
 	header := ui.HeaderStyle.Render(
-		fmt.Sprintf("  %-2s %-20s %-10s %-8s %-8s %-10s %-18s",
-			"", "NAME", "GRAPH", "CPU", "MEM", "STATUS", "PORTS"),
+		fmt.Sprintf("  %-20s %-10s %-8s %-8s %-12s %-18s",
+			"NAME", "GRAPH", "CPU", "MEM", "STATUS", "PORTS"),
 	)
 
 	var rows []string
 	rows = append(rows, header)
 
 	for i, c := range m.containers {
-		statusIcon := ui.StatusIcon(c.Status)
-		statusStr := ui.StatusStyle(c.Status).Render(fmt.Sprintf("%s %-8s", statusIcon, c.Status))
+		cursor := "  "
+		if i == m.cursor {
+			cursor = "▶ "
+		}
 
 		cpu := "-"
 		mem := "-"
@@ -166,7 +171,8 @@ func (m Model) renderContainers() string {
 			mem = fmt.Sprintf("%.0fMB", c.MemMB)
 		}
 
-		// Render the sparkline in green for running containers, gray otherwise.
+		// Sparkline is always 10 runes wide (padded by ui.Sparkline).
+		// Colorize after padding so ANSI codes don't shift subsequent columns.
 		spark := ui.Sparkline(m.history[c.ID])
 		var sparkStr string
 		if c.Status == "running" {
@@ -175,14 +181,20 @@ func (m Model) renderContainers() string {
 			sparkStr = lipgloss.NewStyle().Foreground(ui.ColorGray).Render(spark)
 		}
 
-		cursor := "  "
-		if i == m.cursor {
-			cursor = "▶ "
-		}
+		// Pre-pad status text to 12 chars, then colorize.
+		statusText := fmt.Sprintf("%-12s", fmt.Sprintf("%s %s", ui.StatusIcon(c.Status), c.Status))
+		statusStr := ui.StatusStyle(c.Status).Render(statusText)
 
-		// Build row: the sparkline is rendered separately to preserve ANSI colour codes.
+		// Use %s (no width) for pre-padded ANSI columns; %-Ns for plain-text columns.
 		row := fmt.Sprintf("%s%-20s %s %-8s %-8s %s %-18s",
-			cursor, truncate(c.Name, 20), sparkStr, cpu, mem, statusStr, truncate(c.Ports, 18))
+			cursor,
+			truncate(c.Name, 20),
+			sparkStr,  // 10 wide, pre-padded
+			cpu,       // %-8s
+			mem,       // %-8s
+			statusStr, // 12 wide, pre-padded
+			truncate(c.Ports, 18),
+		)
 
 		if i == m.cursor {
 			row = ui.SelectedRowStyle.Render(row)
