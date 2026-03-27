@@ -21,7 +21,10 @@ Run `dockviz --demo` to try it right now without Docker.
 - **Real-time stats** — CPU and memory usage refreshed every 2 seconds
 - **Network topology** — ASCII graph of container-to-network relationships  
 - **Image browser** — local images with tags and sizes
-- **Container control** — start / stop containers with a single key press
+- **Container control** — start / stop / delete containers with a single key press
+- **CPU sparkline** — 10-point unicode bar graph (▁▂▃▄▅▆▇█) per container row
+- **Real-time log streaming** — `l` key opens a scrollable live log view
+- **Image pull progress** — `dockviz pull <image>` shows per-layer download bars
 - **Detail view** — per-container info (ID, image, ports, status)
 - **Demo mode** — `--demo` flag runs with simulated data, no Docker required
 
@@ -61,7 +64,8 @@ go build -o dockviz .
 | `Enter` | Open container detail |
 | `Esc` | Go back |
 | `s` | Start / Stop selected container |
-| `l` | View container logs *(coming soon)* |
+| `d` | Delete selected container *(with confirmation)* |
+| `l` | Open live log stream |
 | `r` | Force refresh |
 
 ## Architecture
@@ -85,20 +89,24 @@ main.go
 dockviz-cli/
 ├── main.go                        # entry point
 ├── cmd/
-│   └── root.go                    # Cobra CLI, --demo flag
+│   ├── root.go                    # Cobra CLI, --demo flag
+│   └── pull.go                    # `dockviz pull <image>` subcommand
 └── internal/
     ├── docker/
     │   ├── interface.go           # DockerClient interface
     │   ├── client.go              # live Docker SDK wrapper
     │   ├── demo.go                # animated demo data (no daemon needed)
-    │   ├── containers.go          # list, stats, start/stop/restart
+    │   ├── containers.go          # list, stats, start/stop/restart/delete
     │   ├── networks.go            # network topology
-    │   └── images.go              # image list
+    │   ├── images.go              # image list
+    │   ├── pull.go                # image pull with per-layer progress stream
+    │   └── logs.go                # container log streaming
     ├── tui/
     │   ├── model.go               # state (TEA Model)
     │   ├── update.go              # event handling (TEA Update)
     │   ├── view.go                # rendering (TEA View)
     │   ├── keymap.go              # keyboard bindings
+    │   ├── pull.go                # pull progress TUI program
     │   └── start.go               # wires docker client → TUI
     └── ui/
         ├── styles.go              # Lip Gloss color palette and styles
@@ -124,10 +132,13 @@ dockviz-cli/
 - [x] Image browser panel
 - [x] Container detail view
 - [x] `--demo` mode (no Docker required)
-- [ ] Real-time log streaming (`l` key)
-- [ ] Container stats history sparkline
+- [x] `dockviz pull <image>` — real-time per-layer download progress
+- [x] Container delete with confirmation overlay (`d` key)
+- [x] CPU sparkline — 10-point unicode bar graph per container row
+- [x] Real-time log streaming with color coding (`l` key)
+- [x] GitHub Actions release pipeline (Linux / Windows / macOS binaries on tag push)
 - [ ] Remote Docker host support (`DOCKER_HOST`)
-- [ ] GitHub Actions release pipeline (cross-platform binaries)
+- [ ] Container stats history chart (full-screen)
 
 ## License
 
