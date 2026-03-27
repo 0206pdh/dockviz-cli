@@ -7,6 +7,7 @@
 package tui
 
 import (
+	"context"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -68,6 +69,18 @@ type Model struct {
 	// Terminal dimensions
 	width  int
 	height int
+
+	// Delete confirmation overlay
+	confirmDelete bool // true when the "confirm delete" dialog is visible
+
+	// CPU sparkline history: containerID → last 10 CPU% readings
+	history map[string][]float64
+
+	// Log streaming state
+	logs      []string            // accumulated log lines for the current container
+	logScroll int                 // scroll offset (0 = top, len(logs) = bottom)
+	logCh     <-chan docker.LogLine // channel receiving live log lines
+	logCancel context.CancelFunc  // call to stop the streaming goroutine
 }
 
 // Init implements tea.Model. It kicks off the spinner and the first data fetch.
@@ -87,6 +100,7 @@ func newModel(dc docker.DockerClient) Model {
 		keys:        DefaultKeyMap(),
 		spinner:     sp,
 		loading:     true,
+		history:     make(map[string][]float64),
 	}
 }
 

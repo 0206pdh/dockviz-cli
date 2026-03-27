@@ -31,6 +31,7 @@ func (m Model) View() string {
 }
 
 // renderDashboard builds the main three-panel layout.
+// If the delete confirmation overlay is active it is appended below the table.
 func (m Model) renderDashboard() string {
 	title := ui.TitleStyle.Render("  dockviz  ") +
 		ui.FooterStyle.Render(fmt.Sprintf("v0.1.0  •  %d containers", len(m.containers)))
@@ -39,12 +40,47 @@ func (m Model) renderDashboard() string {
 	body := m.renderActivePanel()
 	footer := m.renderFooter()
 
-	return lipgloss.JoinVertical(lipgloss.Left,
+	layout := lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		tabs,
 		body,
 		footer,
 	)
+
+	// Overlay the delete confirmation dialog when the user presses 'd'.
+	if m.confirmDelete && len(m.containers) > 0 {
+		name := m.containers[m.cursor].Name
+		overlay := m.renderConfirmDelete(name)
+		layout = layout + "\n" + overlay
+	}
+
+	return layout
+}
+
+// renderConfirmDelete builds a lipgloss-bordered confirmation dialog.
+func (m Model) renderConfirmDelete(name string) string {
+	dialogStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ui.ColorRed).
+		Padding(0, 2).
+		Width(39)
+
+	line1 := fmt.Sprintf("Remove container %q?", truncate(name, 20))
+	line2 := "This cannot be undone."
+	line3 := ""
+	line4 := ui.ErrorStyle.Render("[y]") + " Yes, remove   " +
+		lipgloss.NewStyle().Foreground(ui.ColorGray).Render("[n]") + " Cancel"
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.NewStyle().Bold(true).Foreground(ui.ColorRed).Render("  Confirm Delete"),
+		"",
+		line1,
+		line2,
+		line3,
+		line4,
+	)
+
+	return "  " + dialogStyle.Render(content)
 }
 
 // renderTabs shows the panel switcher at the top.
@@ -83,9 +119,11 @@ func (m Model) renderActivePanel() string {
 }
 
 // renderContainers builds the container list table.
+// Columns: cursor | NAME | GRAPH (sparkline) | CPU | MEM | STATUS | PORTS
 func (m Model) renderContainers() string {
 	header := ui.HeaderStyle.Render(
-		fmt.Sprintf("  %-20s %-8s %-8s %-10s %-18s", "NAME", "CPU", "MEM", "STATUS", "PORTS"),
+		fmt.Sprintf("  %-2s %-20s %-10s %-8s %-8s %-10s %-18s",
+			"", "NAME", "GRAPH", "CPU", "MEM", "STATUS", "PORTS"),
 	)
 
 	var rows []string
@@ -102,12 +140,23 @@ func (m Model) renderContainers() string {
 			mem = fmt.Sprintf("%.0fMB", c.MemMB)
 		}
 
+		// Render the sparkline in green for running containers, gray otherwise.
+		spark := ui.Sparkline(m.history[c.ID])
+		var sparkStr string
+		if c.Status == "running" {
+			sparkStr = lipgloss.NewStyle().Foreground(ui.ColorGreen).Render(spark)
+		} else {
+			sparkStr = lipgloss.NewStyle().Foreground(ui.ColorGray).Render(spark)
+		}
+
 		cursor := "  "
 		if i == m.cursor {
 			cursor = "▶ "
 		}
-		row := fmt.Sprintf("%s%-20s %-8s %-8s %s %-18s",
-			cursor, truncate(c.Name, 20), cpu, mem, statusStr, truncate(c.Ports, 18))
+
+		// Build row: the sparkline is rendered separately to preserve ANSI colour codes.
+		row := fmt.Sprintf("%s%-20s %s %-8s %-8s %s %-18s",
+			cursor, truncate(c.Name, 20), sparkStr, cpu, mem, statusStr, truncate(c.Ports, 18))
 
 		if i == m.cursor {
 			row = ui.SelectedRowStyle.Render(row)
@@ -168,14 +217,76 @@ func (m Model) renderDetail() string {
 	return "\n  Container not found. [Esc] Back\n"
 }
 
-// renderLogs is a placeholder — full log streaming will be implemented next.
+// renderLogs displays the streamed log output for the selected container.
+// Lines containing ERROR/error are coloured red; WARN/warn lines are yellow;
+// all others appear in the default white. The view respects m.logScroll for
+// manual scrolling and auto-scrolls to the bottom as new lines arrive.
 func (m Model) renderLogs() string {
-	return fmt.Sprintf("\n  Logs for container %s\n\n  (log streaming coming soon)\n\n  [Esc] Back\n", m.selectedID)
+	// Find the container name for the title bar.
+	containerName := m.selectedID
+	for _, c := range m.containers {
+		if c.ID == m.selectedID {
+			containerName = c.Name
+			break
+		}
+	}
+
+	title := ui.TitleStyle.Render(fmt.Sprintf("  Logs — %s", containerName))
+	footer := "\n" + ui.FooterStyle.Render("[Esc] Back  [↑↓] Scroll")
+
+	// Reserve lines for title (1) + blank (1) + footer (2).
+	const reservedLines = 4
+	visibleLines := m.height - reservedLines
+	if visibleLines < 1 {
+		visibleLines = 1
+	}
+
+	// Determine the slice of logs to display based on scroll position.
+	total := len(m.logs)
+	end := m.logScroll
+	if end > total {
+		end = total
+	}
+	start := end - visibleLines
+	if start < 0 {
+		start = 0
+	}
+
+	var sb strings.Builder
+	sb.WriteString(title)
+	sb.WriteString("\n\n")
+
+	if total == 0 {
+		sb.WriteString(ui.FooterStyle.Render("  Waiting for log output..."))
+	} else {
+		for _, line := range m.logs[start:end] {
+			coloredLine := colorLogLine(line)
+			sb.WriteString("  ")
+			sb.WriteString(coloredLine)
+			sb.WriteString("\n")
+		}
+	}
+
+	sb.WriteString(footer)
+	return sb.String()
+}
+
+// colorLogLine applies colour styling to a log line based on its severity keywords.
+func colorLogLine(line string) string {
+	lower := strings.ToLower(line)
+	switch {
+	case strings.Contains(lower, "error"):
+		return lipgloss.NewStyle().Foreground(ui.ColorRed).Render(line)
+	case strings.Contains(lower, "warn"):
+		return lipgloss.NewStyle().Foreground(ui.ColorYellow).Render(line)
+	default:
+		return lipgloss.NewStyle().Foreground(ui.ColorWhite).Render(line)
+	}
 }
 
 // renderFooter shows the keybinding hints at the bottom.
 func (m Model) renderFooter() string {
-	hints := "[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [Enter] Detail  [s] Start/Stop  [l] Logs  [r] Refresh"
+	hints := "[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [Enter] Detail  [s] Start/Stop  [l] Logs  [d] Delete  [r] Refresh"
 	return "\n" + ui.FooterStyle.Render(hints)
 }
 

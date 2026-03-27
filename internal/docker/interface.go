@@ -3,6 +3,8 @@
 // to work identically in live and demo modes.
 package docker
 
+import "context"
+
 // DockerClient is the interface the TUI depends on.
 // The real Client and DemoClient both satisfy it.
 type DockerClient interface {
@@ -13,5 +15,10 @@ type DockerClient interface {
 	StartContainer(id string) error
 	StopContainer(id string) error
 	RestartContainer(id string) error
+	// RemoveContainer force-removes a container (running or stopped).
+	RemoveContainer(id string) error
+	// StreamLogs streams the last 50 lines + live log output for a container.
+	// Cancel the provided context to stop the stream.
+	StreamLogs(ctx context.Context, id string) <-chan LogLine
 	Close()
 }
