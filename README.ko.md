@@ -76,20 +76,32 @@ docker images
 ### Linux / VM — 한 줄 설치 (Go 불필요)
 
 ```bash
+# amd64 (일반 서버/VM)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-amd64 \
+  -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
+
+# arm64 (라즈베리 파이, AWS Graviton 등)
+curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-arm64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 ```
 
 ### macOS
 
 ```bash
+# Intel Mac (amd64)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-amd64 \
+  -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
+
+# Apple Silicon (M1/M2/M3)
+curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-arm64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 ```
 
 ### Windows
 
-[Releases 페이지](https://github.com/0206pdh/dockviz-cli/releases/latest)에서 `dockviz-windows-amd64.exe` 다운로드
+[Releases 페이지](https://github.com/0206pdh/dockviz-cli/releases/latest)에서 다운로드:
+- `dockviz-windows-amd64.exe` — Intel/AMD
+- `dockviz-windows-arm64.exe` — ARM (Surface Pro X 등)
 
 ### 소스 빌드
 

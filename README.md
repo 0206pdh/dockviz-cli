@@ -41,20 +41,32 @@ Run `dockviz --demo` to try it right now without Docker.
 ### Linux / VM — one-liner (no Go required)
 
 ```bash
+# amd64 (most servers/VMs)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-amd64 \
+  -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
+
+# arm64 (Raspberry Pi, AWS Graviton, etc.)
+curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-arm64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 ```
 
 ### macOS — one-liner
 
 ```bash
+# Intel Mac (amd64)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-amd64 \
+  -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
+
+# Apple Silicon (M1/M2/M3)
+curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-arm64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 ```
 
 ### Windows
 
-Download `dockviz-windows-amd64.exe` from the [Releases page](https://github.com/0206pdh/dockviz-cli/releases/latest).
+Download from the [Releases page](https://github.com/0206pdh/dockviz-cli/releases/latest):
+- `dockviz-windows-amd64.exe` — Intel/AMD
+- `dockviz-windows-arm64.exe` — ARM (Surface Pro X, etc.)
 
 ### Build from source
 
