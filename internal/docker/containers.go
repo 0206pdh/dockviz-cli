@@ -84,6 +84,12 @@ func (c *Client) RestartContainer(id string) error {
 	return c.cli.ContainerRestart(c.ctx, id, container.StopOptions{Timeout: &timeout})
 }
 
+// RemoveContainer force-removes a container regardless of its running state.
+// Equivalent to `docker rm -f <id>`.
+func (c *Client) RemoveContainer(id string) error {
+	return c.cli.ContainerRemove(c.ctx, id, container.RemoveOptions{Force: true})
+}
+
 // --- helpers ---
 
 func calcCPUPercent(stats container.StatsResponse) float64 {

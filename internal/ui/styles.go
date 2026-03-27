@@ -89,3 +89,41 @@ func StatusIcon(state string) string {
 		return "○"
 	}
 }
+
+// Sparkline converts a slice of float64 values (0-100) into a unicode bar string
+// using the block element characters ▁▂▃▄▅▆▇█. The result is always 10 runes wide,
+// left-padded with spaces when fewer than 10 values are provided.
+func Sparkline(values []float64) string {
+	if len(values) == 0 {
+		return "          " // 10 spaces — placeholder before any data arrives
+	}
+	bars := []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
+
+	// Determine the peak value for normalisation.
+	// Use 0.1 as the minimum to avoid division-by-zero on all-zero data.
+	max := 0.1
+	for _, v := range values {
+		if v > max {
+			max = v
+		}
+	}
+
+	result := make([]rune, len(values))
+	for i, v := range values {
+		idx := int((v / max) * float64(len(bars)-1))
+		if idx >= len(bars) {
+			idx = len(bars) - 1
+		}
+		if idx < 0 {
+			idx = 0
+		}
+		result[i] = bars[idx]
+	}
+
+	// Left-pad with spaces to fill the fixed 10-character column width.
+	s := string(result)
+	for len([]rune(s)) < 10 {
+		s = " " + s
+	}
+	return s
+}

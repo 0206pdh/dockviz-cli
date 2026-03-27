@@ -1,0 +1,75 @@
+# release.yml — build cross-platform binaries and publish a GitHub Release
+# on every push of a version tag (e.g. v1.2.3).
+#
+# Artifacts produced:
+#   dockviz-linux-amd64
+#   dockviz-windows-amd64.exe
+#   dockviz-darwin-amd64
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"   # trigger on any tag that looks like a version
+
+jobs:
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ""
+          - goos: windows
+            goarch: amd64
+            ext: ".exe"
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod   # reads the 'go' directive from go.mod
+
+      - name: Build binary
+        run: |
+          GOOS=${{ matrix.goos }} \
+          GOARCH=${{ matrix.goarch }} \
+          go build \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o dockviz-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockviz-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dockviz-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to create releases and upload assets
+
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/          # each artifact lands in dist/<artifact-name>/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Attach every binary found under dist/.
+          files: dist/**/*
+          generate_release_notes: true

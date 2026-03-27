@@ -4,11 +4,16 @@
 package tui
 
 import (
+	"context"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/yourusername/dockviz-cli/internal/docker"
 )
+
+// logLineMsg carries a single log line received from the streaming goroutine.
+type logLineMsg string
 
 // Update is called by Bubble Tea whenever a message arrives.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -43,6 +48,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.images = msg.images
 		// Clamp cursor to list length
 		m.cursor = clamp(m.cursor, 0, m.activeListLen()-1)
+
+		// Update per-container CPU sparkline history.
+		// We keep at most 10 readings per container to fit the sparkline width.
+		for _, c := range m.containers {
+			h := m.history[c.ID]
+			if c.Status == "running" {
+				h = append(h, c.CPUPerc)
+				if len(h) > 10 {
+					h = h[len(h)-10:]
+				}
+			}
+			m.history[c.ID] = h
+		}
+		return m, nil
+
+	// A single log line arrived from the streaming goroutine
+	case logLineMsg:
+		m.logs = append(m.logs, string(msg))
+		// Auto-scroll to the newest line
+		m.logScroll = len(m.logs)
+		// Immediately wait for the next line on the same channel
+		if m.logCh != nil {
+			return m, waitForLogCmd(m.logCh)
+		}
 		return m, nil
 
 	// Keyboard input
@@ -53,10 +82,62 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleKey dispatches key presses based on the current view.
+// handleKey dispatches key presses based on the current view and overlay state.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	km := m.keys
 
+	// --- Delete confirmation overlay intercepts ALL keys while visible ---
+	if m.confirmDelete {
+		switch msg.String() {
+		case "y", "Y":
+			// User confirmed: remove the container and refresh data.
+			id := m.containers[m.cursor].ID
+			m.confirmDelete = false
+			return m, removeContainerCmd(m.docker, id)
+		case "n", "N", "esc":
+			// User cancelled.
+			m.confirmDelete = false
+		}
+		return m, nil
+	}
+
+	// --- Log view key handling ---
+	if m.activeView == ViewLogs {
+		switch {
+		case keyMatches(msg, km.Quit):
+			// Stop the log stream before quitting.
+			if m.logCancel != nil {
+				m.logCancel()
+				m.logCancel = nil
+			}
+			return m, tea.Quit
+
+		case keyMatches(msg, km.Back):
+			// Stop stream and return to the dashboard.
+			if m.logCancel != nil {
+				m.logCancel()
+				m.logCancel = nil
+			}
+			m.logCh = nil
+			m.activeView = ViewDashboard
+			return m, nil
+
+		case keyMatches(msg, km.Up):
+			if m.logScroll > 0 {
+				m.logScroll--
+			}
+			return m, nil
+
+		case keyMatches(msg, km.Down):
+			if m.logScroll < len(m.logs) {
+				m.logScroll++
+			}
+			return m, nil
+		}
+		return m, nil
+	}
+
+	// --- Normal dashboard key handling ---
 	switch {
 	case keyMatches(msg, km.Quit):
 		return m, tea.Quit
@@ -94,10 +175,29 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, toggleContainerCmd(m.docker, ctr.ID, ctr.Status)
 		}
 
-	case keyMatches(msg, km.Logs):
+	case keyMatches(msg, km.Delete):
+		// Show the confirmation overlay — actual removal happens on "y".
 		if m.activePanel == PanelContainers && len(m.containers) > 0 {
-			m.selectedID = m.containers[m.cursor].ID
+			m.confirmDelete = true
+		}
+
+	case keyMatches(msg, km.Logs):
+		// Open the log view for the selected container, starting a fresh stream.
+		if m.activePanel == PanelContainers && len(m.containers) > 0 {
+			ctr := m.containers[m.cursor]
+			// Cancel any previous stream to avoid leaking goroutines.
+			if m.logCancel != nil {
+				m.logCancel()
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			ch := m.docker.StreamLogs(ctx, ctr.ID)
+			m.selectedID = ctr.ID
 			m.activeView = ViewLogs
+			m.logs = nil
+			m.logScroll = 0
+			m.logCh = ch
+			m.logCancel = cancel
+			return m, waitForLogCmd(ch)
 		}
 	}
 
@@ -118,6 +218,27 @@ func toggleContainerCmd(dc docker.DockerClient, id, status string) tea.Cmd {
 		}
 		// Fetch fresh data right after the action
 		return fetchDataCmd(dc)()
+	}
+}
+
+// removeContainerCmd force-removes a container then refreshes the container list.
+func removeContainerCmd(dc docker.DockerClient, id string) tea.Cmd {
+	return func() tea.Msg {
+		_ = dc.RemoveContainer(id)
+		return fetchDataCmd(dc)()
+	}
+}
+
+// waitForLogCmd blocks until the next line arrives on ch, then emits it as a logLineMsg.
+// Returns nil when the channel is closed (stream ended).
+func waitForLogCmd(ch <-chan docker.LogLine) tea.Cmd {
+	return func() tea.Msg {
+		line, ok := <-ch
+		if !ok {
+			// Channel closed — stream ended or context cancelled.
+			return nil
+		}
+		return logLineMsg(line.Text)
 	}
 }
 

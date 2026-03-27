@@ -14,6 +14,7 @@ type KeyMap struct {
 	Refresh key.Binding
 	Toggle  key.Binding // start/stop container
 	Logs    key.Binding
+	Delete  key.Binding // force-remove a container
 	Quit    key.Binding
 }
 
@@ -51,6 +52,10 @@ func DefaultKeyMap() KeyMap {
 		Logs: key.NewBinding(
 			key.WithKeys("l"),
 			key.WithHelp("l", "logs"),
+		),
+		Delete: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "delete container"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),

@@ -3,6 +3,7 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -143,6 +144,37 @@ func (d *DemoClient) RestartContainer(id string) error {
 // FetchStats returns animated fake stats (not used — stats are inlined in ListContainers for demo).
 func (d *DemoClient) FetchStats(id string) (float64, float64, error) {
 	return rand.Float64() * 20, rand.Float64() * 200, nil
+}
+
+// RemoveContainer simulates a container removal with a short delay.
+func (d *DemoClient) RemoveContainer(id string) error {
+	time.Sleep(200 * time.Millisecond)
+	return nil
+}
+
+// StreamLogs simulates a live log stream with pre-canned demo lines.
+// Each line is emitted with a 500ms delay to mimic a real service.
+func (d *DemoClient) StreamLogs(ctx context.Context, id string) <-chan LogLine {
+	ch := make(chan LogLine, 10)
+	go func() {
+		defer close(ch)
+		lines := []string{
+			"2026-03-27T10:00:00Z [INFO] Server started on :3000",
+			"2026-03-27T10:00:01Z [INFO] Connected to database",
+			"2026-03-27T10:00:05Z [INFO] GET /api/health 200 OK",
+			"2026-03-27T10:00:10Z [INFO] GET /api/users 200 OK",
+			"2026-03-27T10:00:15Z [WARN] Rate limit approaching",
+		}
+		for _, l := range lines {
+			select {
+			case ch <- LogLine{Text: l}:
+			case <-ctx.Done():
+				return
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
+	return ch
 }
 
 // wave produces a smoothly oscillating value for realistic-looking animated stats.
