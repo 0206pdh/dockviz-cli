@@ -1,0 +1,13 @@
+# Build output
+dockviz
+dockviz.exe
+dist/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
