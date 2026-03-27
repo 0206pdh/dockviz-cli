@@ -47,40 +47,36 @@ func (m Model) renderDashboard() string {
 		footer,
 	)
 
-	// Overlay the delete confirmation dialog when the user presses 'd'.
+	// When 'd' is pressed, replace the entire screen with the confirmation dialog.
 	if m.confirmDelete && len(m.containers) > 0 {
 		name := m.containers[m.cursor].Name
-		overlay := m.renderConfirmDelete(name)
-		layout = layout + "\n" + overlay
+		return m.renderConfirmDelete(name)
 	}
 
 	return layout
 }
 
-// renderConfirmDelete builds a lipgloss-bordered confirmation dialog.
+// renderConfirmDelete replaces the full screen with a prominent red-bordered dialog.
 func (m Model) renderConfirmDelete(name string) string {
 	dialogStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.DoubleBorder()).
 		BorderForeground(ui.ColorRed).
-		Padding(0, 2).
-		Width(39)
+		Padding(1, 4).
+		Width(50)
 
-	line1 := fmt.Sprintf("Remove container %q?", truncate(name, 20))
-	line2 := "This cannot be undone."
-	line3 := ""
-	line4 := ui.ErrorStyle.Render("[y]") + " Yes, remove   " +
-		lipgloss.NewStyle().Foreground(ui.ColorGray).Render("[n]") + " Cancel"
+	title := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorRed).Render("  ⚠  Confirm Delete")
+	line1 := fmt.Sprintf("Container:  %s", lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Render(truncate(name, 30)))
+	line2 := lipgloss.NewStyle().Foreground(ui.ColorGray).Render("This will force-remove the container.")
+	line2b := lipgloss.NewStyle().Foreground(ui.ColorGray).Render("Running containers are stopped first.")
+	gap := ""
+	confirm := ui.ErrorStyle.Render("[y] Yes, remove") + "    " +
+		lipgloss.NewStyle().Foreground(ui.ColorGray).Render("[n / Esc] Cancel")
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
-		lipgloss.NewStyle().Bold(true).Foreground(ui.ColorRed).Render("  Confirm Delete"),
-		"",
-		line1,
-		line2,
-		line3,
-		line4,
+		title, gap, line1, gap, line2, line2b, gap, confirm,
 	)
 
-	return "  " + dialogStyle.Render(content)
+	return "\n\n\n" + "  " + dialogStyle.Render(content)
 }
 
 // renderTabs shows the panel switcher at the top.
@@ -284,10 +280,11 @@ func colorLogLine(line string) string {
 	}
 }
 
-// renderFooter shows the keybinding hints at the bottom.
+// renderFooter shows the keybinding hints at the bottom split across two lines.
 func (m Model) renderFooter() string {
-	hints := "[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [Enter] Detail  [s] Start/Stop  [l] Logs  [d] Delete  [r] Refresh"
-	return "\n" + ui.FooterStyle.Render(hints)
+	line1 := "[q] Quit  [Tab] Panel  [↑↓] Navigate  [Enter] Detail  [r] Refresh"
+	line2 := "[s] Start/Stop  [d] Delete  [l] Logs  [p] Pull (Images panel)"
+	return "\n" + ui.FooterStyle.Render(line1) + "\n" + ui.FooterStyle.Render(line2)
 }
 
 // truncate shortens s to max length, adding "…" if needed.
