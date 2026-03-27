@@ -41,10 +41,11 @@ var (
 			Foreground(ColorBlue).
 			Underline(true)
 
-	// Selected row in a list
+	// Selected row in a list — bright enough to see on any dark terminal
 	SelectedRowStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("#2A2A4A")).
-				Foreground(ColorWhite)
+				Background(lipgloss.Color("#4DA6FF")).
+				Foreground(lipgloss.Color("#000000")).
+				Bold(true)
 
 	// Status badges
 	StatusRunning = lipgloss.NewStyle().Foreground(ColorGreen).Bold(true)

@@ -56,12 +56,14 @@ func (m Model) renderTabs() string {
 		if Panel(i) == m.activePanel {
 			parts = append(parts, lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ui.ColorBlue).
-				Underline(true).
+				Background(ui.ColorBlue).
+				Foreground(lipgloss.Color("#000000")).
+				Padding(0, 1).
 				Render(s))
 		} else {
 			parts = append(parts, lipgloss.NewStyle().
 				Foreground(ui.ColorGray).
+				Padding(0, 1).
 				Render(s))
 		}
 	}
@@ -100,8 +102,12 @@ func (m Model) renderContainers() string {
 			mem = fmt.Sprintf("%.0fMB", c.MemMB)
 		}
 
-		row := fmt.Sprintf("  %-20s %-8s %-8s %s %-18s",
-			truncate(c.Name, 20), cpu, mem, statusStr, truncate(c.Ports, 18))
+		cursor := "  "
+		if i == m.cursor {
+			cursor = "▶ "
+		}
+		row := fmt.Sprintf("%s%-20s %-8s %-8s %s %-18s",
+			cursor, truncate(c.Name, 20), cpu, mem, statusStr, truncate(c.Ports, 18))
 
 		if i == m.cursor {
 			row = ui.SelectedRowStyle.Render(row)
@@ -132,8 +138,12 @@ func (m Model) renderImages() string {
 	rows = append(rows, header)
 
 	for i, img := range m.images {
-		row := fmt.Sprintf("  %-40s %-14s %-10s",
-			truncate(img.Tags, 40), img.ID, docker.FormatSize(img.SizeMB))
+		cursor := "  "
+		if i == m.cursor {
+			cursor = "▶ "
+		}
+		row := fmt.Sprintf("%s%-40s %-14s %-10s",
+			cursor, truncate(img.Tags, 40), img.ID, docker.FormatSize(img.SizeMB))
 		if i == m.cursor {
 			row = ui.SelectedRowStyle.Render(row)
 		}
