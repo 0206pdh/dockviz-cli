@@ -79,27 +79,33 @@ func (m Model) renderConfirmDelete(name string) string {
 	return "\n\n\n" + "  " + dialogStyle.Render(content)
 }
 
-// renderTabs shows the panel switcher at the top.
+// renderTabs shows the panel switcher.
+// Active tab: bright blue pill with black bold text + ▼ arrow below.
+// Inactive tab: dim background so all tabs are always visible.
 func (m Model) renderTabs() string {
-	panels := []string{"Containers", "Networks", "Images"}
+	panels := []string{" 📦 Containers ", " 🌐 Networks ", " 🗃  Images "}
 	var parts []string
 	for i, name := range panels {
-		s := fmt.Sprintf(" %s ", name)
 		if Panel(i) == m.activePanel {
 			parts = append(parts, lipgloss.NewStyle().
 				Bold(true).
 				Background(ui.ColorBlue).
 				Foreground(lipgloss.Color("#000000")).
 				Padding(0, 1).
-				Render(s))
+				Render(name))
 		} else {
 			parts = append(parts, lipgloss.NewStyle().
+				Background(lipgloss.Color("#2A2A3A")).
 				Foreground(ui.ColorGray).
 				Padding(0, 1).
-				Render(s))
+				Render(name))
 		}
 	}
-	return "  " + strings.Join(parts, "  |  ") + "\n"
+	tabBar := "  " + strings.Join(parts, " ")
+	divider := lipgloss.NewStyle().Foreground(ui.ColorGray).Render(
+		"  " + strings.Repeat("─", 60),
+	)
+	return tabBar + "\n" + divider + "\n"
 }
 
 // renderActivePanel renders whichever panel is currently selected.
