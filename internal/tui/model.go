@@ -73,6 +73,9 @@ type Model struct {
 	// Delete confirmation overlay
 	confirmDelete bool // true when the "confirm delete" dialog is visible
 
+	// refreshing is true between pressing 'r' and the data arriving back
+	refreshing bool
+
 	// CPU sparkline history: containerID → last 10 CPU% readings
 	history map[string][]float64
 

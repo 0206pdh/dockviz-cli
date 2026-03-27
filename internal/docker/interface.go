@@ -17,6 +17,8 @@ type DockerClient interface {
 	RestartContainer(id string) error
 	// RemoveContainer force-removes a container (running or stopped).
 	RemoveContainer(id string) error
+	// RemoveImage removes a local image by ID or tag.
+	RemoveImage(id string) error
 	// StreamLogs streams the last 50 lines + live log output for a container.
 	// Cancel the provided context to stop the stream.
 	StreamLogs(ctx context.Context, id string) <-chan LogLine

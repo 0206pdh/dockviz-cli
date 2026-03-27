@@ -41,6 +41,12 @@ func (c *Client) ListImages() ([]ImageInfo, error) {
 	return result, nil
 }
 
+// RemoveImage removes a local image (force, to handle tagged images).
+func (c *Client) RemoveImage(id string) error {
+	_, err := c.cli.ImageRemove(c.ctx, id, image.RemoveOptions{Force: true})
+	return err
+}
+
 // FormatSize returns a human-readable size string (MB or GB).
 func FormatSize(mb float64) string {
 	if mb >= 1024 {
