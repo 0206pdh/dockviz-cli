@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/yourusername/dockviz-cli/internal/docker"
+	"github.com/0206pdh/dockviz-cli/internal/docker"
 )
 
 // Start connects to Docker (or uses demo data), builds the model, and runs the TUI.

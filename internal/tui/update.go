@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/yourusername/dockviz-cli/internal/docker"
+	"github.com/0206pdh/dockviz-cli/internal/docker"
 )
 
 // logLineMsg carries a single log line received from the streaming goroutine.

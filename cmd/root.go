@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/yourusername/dockviz-cli/internal/tui"
+	"github.com/0206pdh/dockviz-cli/internal/tui"
 )
 
 var demoMode bool

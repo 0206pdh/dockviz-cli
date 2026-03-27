@@ -10,8 +10,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/yourusername/dockviz-cli/internal/docker"
-	"github.com/yourusername/dockviz-cli/internal/ui"
+	"github.com/0206pdh/dockviz-cli/internal/docker"
+	"github.com/0206pdh/dockviz-cli/internal/ui"
 )
 
 // pullModel is the Bubble Tea model for the pull progress screen.

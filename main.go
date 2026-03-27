@@ -1,6 +1,6 @@
 package main
 
-import "github.com/yourusername/dockviz-cli/cmd"
+import "github.com/0206pdh/dockviz-cli/cmd"
 
 // version is set at build time via -ldflags="-X main.version=<tag>".
 // It defaults to "dev" for local builds.
