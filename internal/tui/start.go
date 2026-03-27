@@ -11,7 +11,7 @@ import (
 
 // Start connects to Docker (or uses demo data), builds the model, and runs the TUI.
 // Pass demo=true to run without a live Docker daemon.
-func Start(demo bool) error {
+func Start(demo bool, version string) error {
 	var dc docker.DockerClient
 	if demo {
 		dc = docker.NewDemoClient()
@@ -24,7 +24,7 @@ func Start(demo bool) error {
 	}
 	defer dc.Close()
 
-	m := newModel(dc)
+	m := newModel(dc, version)
 
 	// Init() on the model handles the first fetch and tick automatically.
 	p := tea.NewProgram(m,

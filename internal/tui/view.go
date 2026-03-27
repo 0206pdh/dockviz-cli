@@ -39,7 +39,7 @@ func (m Model) renderDashboard() string {
 		statusHint = lipgloss.NewStyle().Foreground(ui.ColorYellow).Render("  ↻ Refreshing...")
 	}
 	title := ui.TitleStyle.Render("  dockviz  ") +
-		ui.FooterStyle.Render(fmt.Sprintf("v0.1.0  •  %d containers", len(m.containers))) +
+		ui.FooterStyle.Render(fmt.Sprintf("%s  •  %d containers", m.version, len(m.containers))) +
 		statusHint
 
 	tabs := m.renderTabs()
