@@ -38,6 +38,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Fresh Docker data arrived
 	case dataMsg:
 		m.loading = false
+		m.refreshing = false
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
@@ -90,10 +91,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.confirmDelete {
 		switch msg.String() {
 		case "y", "Y":
-			// User confirmed: remove the container and refresh data.
-			id := m.containers[m.cursor].ID
 			m.confirmDelete = false
-			return m, removeContainerCmd(m.docker, id)
+			if m.activePanel == PanelImages && len(m.images) > 0 {
+				id := m.images[m.cursor].ID
+				return m, removeImageCmd(m.docker, id)
+			}
+			// Default: container removal
+			if len(m.containers) > 0 {
+				id := m.containers[m.cursor].ID
+				return m, removeContainerCmd(m.docker, id)
+			}
 		case "n", "N", "esc":
 			// User cancelled.
 			m.confirmDelete = false
@@ -157,7 +164,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 
 	case keyMatches(msg, km.Refresh):
-		m.loading = true
+		m.refreshing = true
 		return m, fetchDataCmd(m.docker)
 
 	case keyMatches(msg, km.Back):
@@ -178,6 +185,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyMatches(msg, km.Delete):
 		// Show the confirmation overlay — actual removal happens on "y".
 		if m.activePanel == PanelContainers && len(m.containers) > 0 {
+			m.confirmDelete = true
+		}
+		if m.activePanel == PanelImages && len(m.images) > 0 {
 			m.confirmDelete = true
 		}
 
@@ -225,6 +235,14 @@ func toggleContainerCmd(dc docker.DockerClient, id, status string) tea.Cmd {
 func removeContainerCmd(dc docker.DockerClient, id string) tea.Cmd {
 	return func() tea.Msg {
 		_ = dc.RemoveContainer(id)
+		return fetchDataCmd(dc)()
+	}
+}
+
+// removeImageCmd removes a local image then refreshes the data.
+func removeImageCmd(dc docker.DockerClient, id string) tea.Cmd {
+	return func() tea.Msg {
+		_ = dc.RemoveImage(id)
 		return fetchDataCmd(dc)()
 	}
 }

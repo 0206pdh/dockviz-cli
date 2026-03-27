@@ -33,75 +33,99 @@ func (m Model) View() string {
 // renderDashboard builds the main three-panel layout.
 // If the delete confirmation overlay is active it is appended below the table.
 func (m Model) renderDashboard() string {
+	// Show ↻ Refreshing... next to the title when a manual refresh is in progress.
+	statusHint := ""
+	if m.refreshing {
+		statusHint = lipgloss.NewStyle().Foreground(ui.ColorYellow).Render("  ↻ Refreshing...")
+	}
 	title := ui.TitleStyle.Render("  dockviz  ") +
-		ui.FooterStyle.Render(fmt.Sprintf("v0.1.0  •  %d containers", len(m.containers)))
+		ui.FooterStyle.Render(fmt.Sprintf("v0.1.0  •  %d containers", len(m.containers))) +
+		statusHint
 
 	tabs := m.renderTabs()
 	body := m.renderActivePanel()
 	footer := m.renderFooter()
 
-	layout := lipgloss.JoinVertical(lipgloss.Left,
+	// When 'd' is pressed, replace the entire screen with the confirmation dialog.
+	if m.confirmDelete {
+		if m.activePanel == PanelImages && len(m.images) > 0 {
+			return m.renderConfirmDelete(m.images[m.cursor].Tags, "image")
+		}
+		if m.activePanel == PanelContainers && len(m.containers) > 0 {
+			return m.renderConfirmDelete(m.containers[m.cursor].Name, "container")
+		}
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		tabs,
 		body,
 		footer,
 	)
-
-	// When 'd' is pressed, replace the entire screen with the confirmation dialog.
-	if m.confirmDelete && len(m.containers) > 0 {
-		name := m.containers[m.cursor].Name
-		return m.renderConfirmDelete(name)
-	}
-
-	return layout
 }
 
 // renderConfirmDelete replaces the full screen with a prominent red-bordered dialog.
-func (m Model) renderConfirmDelete(name string) string {
+// kind is "container" or "image".
+func (m Model) renderConfirmDelete(name, kind string) string {
 	dialogStyle := lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(ui.ColorRed).
 		Padding(1, 4).
 		Width(50)
 
+	kindLabel := "Container"
+	subText := "This will force-remove the container.\nRunning containers are stopped first."
+	if kind == "image" {
+		kindLabel = "Image"
+		subText = "This will remove the local image.\nContainers using it must be removed first."
+	}
+
 	title := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorRed).Render("  ⚠  Confirm Delete")
-	line1 := fmt.Sprintf("Container:  %s", lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Render(truncate(name, 30)))
-	line2 := lipgloss.NewStyle().Foreground(ui.ColorGray).Render("This will force-remove the container.")
-	line2b := lipgloss.NewStyle().Foreground(ui.ColorGray).Render("Running containers are stopped first.")
+	line1 := fmt.Sprintf("%s:  %s", kindLabel, lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Render(truncate(name, 30)))
+	line2 := lipgloss.NewStyle().Foreground(ui.ColorGray).Render(subText)
 	gap := ""
 	confirm := ui.ErrorStyle.Render("[y] Yes, remove") + "    " +
 		lipgloss.NewStyle().Foreground(ui.ColorGray).Render("[n / Esc] Cancel")
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
-		title, gap, line1, gap, line2, line2b, gap, confirm,
+		title, gap, line1, gap, line2, gap, confirm,
 	)
 
 	return "\n\n\n" + "  " + dialogStyle.Render(content)
 }
 
 // renderTabs shows the panel switcher.
-// Active tab: bright blue pill with black bold text + ▼ arrow below.
-// Inactive tab: dim background so all tabs are always visible.
+// Active tab: bright cyan background, bold black text, surrounded by [ ] brackets.
+// Inactive tab: plain dim text, no background, clearly different.
 func (m Model) renderTabs() string {
-	panels := []string{" 📦 Containers ", " 🌐 Networks ", " 🗃  Images "}
+	type tabDef struct {
+		label string
+		panel Panel
+	}
+	tabs := []tabDef{
+		{" 📦 Containers ", PanelContainers},
+		{" 🌐 Networks ", PanelNetworks},
+		{" 🗃  Images ", PanelImages},
+	}
+
 	var parts []string
-	for i, name := range panels {
-		if Panel(i) == m.activePanel {
+	for _, t := range tabs {
+		if t.panel == m.activePanel {
 			parts = append(parts, lipgloss.NewStyle().
 				Bold(true).
-				Background(ui.ColorBlue).
+				Background(lipgloss.Color("#00CFCF")).
 				Foreground(lipgloss.Color("#000000")).
 				Padding(0, 1).
-				Render(name))
+				Render("▶"+t.label+"◀"))
 		} else {
 			parts = append(parts, lipgloss.NewStyle().
-				Background(lipgloss.Color("#2A2A3A")).
-				Foreground(ui.ColorGray).
+				Foreground(lipgloss.Color("#555555")).
 				Padding(0, 1).
-				Render(name))
+				Render(t.label))
 		}
 	}
-	tabBar := "  " + strings.Join(parts, " ")
+
+	tabBar := "  " + strings.Join(parts, "  ")
 	divider := lipgloss.NewStyle().Foreground(ui.ColorGray).Render(
 		"  " + strings.Repeat("─", 60),
 	)
@@ -288,8 +312,8 @@ func colorLogLine(line string) string {
 
 // renderFooter shows the keybinding hints at the bottom split across two lines.
 func (m Model) renderFooter() string {
-	line1 := "[q] Quit  [Tab] Panel  [↑↓] Navigate  [Enter] Detail  [r] Refresh"
-	line2 := "[s] Start/Stop  [d] Delete  [l] Logs  [p] Pull (Images panel)"
+	line1 := "[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [Enter] Detail  [r] Refresh"
+	line2 := "[s] Start/Stop  [d] Delete  [l] Logs (Containers)"
 	return "\n" + ui.FooterStyle.Render(line1) + "\n" + ui.FooterStyle.Render(line2)
 }
 

@@ -152,6 +152,12 @@ func (d *DemoClient) RemoveContainer(id string) error {
 	return nil
 }
 
+// RemoveImage simulates an image removal.
+func (d *DemoClient) RemoveImage(id string) error {
+	time.Sleep(200 * time.Millisecond)
+	return nil
+}
+
 // StreamLogs simulates a live log stream with pre-canned demo lines.
 // Each line is emitted with a 500ms delay to mimic a real service.
 func (d *DemoClient) StreamLogs(ctx context.Context, id string) <-chan LogLine {
