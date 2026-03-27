@@ -1,4 +1,4 @@
-module github.com/yourusername/dockviz-cli
+module github.com/0206pdh/dockviz-cli
 
 go 1.25.0
 

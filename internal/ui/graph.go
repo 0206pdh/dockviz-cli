@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yourusername/dockviz-cli/internal/docker"
+	"github.com/0206pdh/dockviz-cli/internal/docker"
 )
 
 // RenderNetworkGraph builds a multi-line ASCII representation of Docker networks.
