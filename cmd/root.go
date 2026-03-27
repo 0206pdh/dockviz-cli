@@ -10,15 +10,26 @@ import (
 	"github.com/yourusername/dockviz-cli/internal/tui"
 )
 
+var demoMode bool
+
 var rootCmd = &cobra.Command{
 	Use:   "dockviz",
 	Short: "Interactive Docker environment visualizer",
-	Long: `dockviz-cli is a TUI dashboard that shows real-time Docker
-container stats, network topology, and lets you control containers
-directly from your terminal.`,
+	Long: `dockviz-cli is a TUI dashboard for monitoring your Docker environment.
+
+It shows real-time container stats, network topology, and lets you
+start/stop containers directly from the terminal.
+
+Run with --demo to preview the dashboard without a running Docker daemon.`,
+	Example: `  dockviz           # connect to local Docker daemon
+  dockviz --demo    # run with simulated data (no Docker required)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return tui.Start()
+		return tui.Start(demoMode)
 	},
+}
+
+func init() {
+	rootCmd.Flags().BoolVar(&demoMode, "demo", false, "Run with simulated data (no Docker daemon required)")
 }
 
 // Execute is called from main.go. It runs the root Cobra command.

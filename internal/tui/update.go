@@ -105,7 +105,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // toggleContainerCmd starts or stops a container depending on its current status.
-func toggleContainerCmd(dc *docker.Client, id, status string) tea.Cmd {
+func toggleContainerCmd(dc docker.DockerClient, id, status string) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		if status == "running" {

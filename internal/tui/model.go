@@ -45,8 +45,8 @@ type dataMsg struct {
 
 // Model is the entire application state.
 type Model struct {
-	// Docker connection
-	docker *docker.Client
+	// Docker connection (real or demo)
+	docker docker.DockerClient
 
 	// Current data
 	containers []docker.ContainerInfo
@@ -75,8 +75,8 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, fetchDataCmd(m.docker), tickCmd())
 }
 
-// newModel creates the initial Model. Docker client is passed in from Start().
-func newModel(dc *docker.Client) Model {
+// newModel creates the initial Model. Accepts any DockerClient (real or demo).
+func newModel(dc docker.DockerClient) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 
@@ -98,7 +98,7 @@ func tickCmd() tea.Cmd {
 }
 
 // fetchDataCmd fetches all Docker data off the main goroutine and returns a dataMsg.
-func fetchDataCmd(dc *docker.Client) tea.Cmd {
+func fetchDataCmd(dc docker.DockerClient) tea.Cmd {
 	return func() tea.Msg {
 		containers, err := dc.ListContainers()
 		if err != nil {
