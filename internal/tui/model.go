@@ -74,7 +74,8 @@ type Model struct {
 	height int
 
 	// Delete confirmation overlay
-	confirmDelete bool // true when the "confirm delete" dialog is visible
+	confirmDelete   bool   // true when the "confirm delete" dialog is visible
+	pendingDeleteID string // ID of the item to delete (captured at dialog open time)
 
 	// refreshing is true between pressing 'r' and the data arriving back
 	refreshing bool

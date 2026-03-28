@@ -92,18 +92,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "y", "Y":
 			m.confirmDelete = false
-			if m.activePanel == PanelImages && len(m.images) > 0 {
-				id := m.images[m.cursor].ID
+			id := m.pendingDeleteID
+			m.pendingDeleteID = ""
+			if m.activePanel == PanelImages {
 				return m, removeImageCmd(m.docker, id)
 			}
 			// Default: container removal
-			if len(m.containers) > 0 {
-				id := m.containers[m.cursor].ID
-				return m, removeContainerCmd(m.docker, id)
-			}
+			return m, removeContainerCmd(m.docker, id)
 		case "n", "N", "esc":
 			// User cancelled.
 			m.confirmDelete = false
+			m.pendingDeleteID = ""
 		}
 		return m, nil
 	}
@@ -183,11 +182,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case keyMatches(msg, km.Delete):
-		// Show the confirmation overlay — actual removal happens on "y".
+		// Capture the ID now so auto-refresh can't change it before "y" is pressed.
 		if m.activePanel == PanelContainers && len(m.containers) > 0 {
+			m.pendingDeleteID = m.containers[m.cursor].ID
 			m.confirmDelete = true
 		}
 		if m.activePanel == PanelImages && len(m.images) > 0 {
+			m.pendingDeleteID = m.images[m.cursor].ID
 			m.confirmDelete = true
 		}
 
