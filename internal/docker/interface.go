@@ -22,5 +22,9 @@ type DockerClient interface {
 	// StreamLogs streams the last 50 lines + live log output for a container.
 	// Cancel the provided context to stop the stream.
 	StreamLogs(ctx context.Context, id string) <-chan LogLine
+	// StreamEvents streams container lifecycle events (start, stop, die, etc.).
+	// Includes the past hour of events on first call, then live from there.
+	// Cancel the provided context to stop the stream.
+	StreamEvents(ctx context.Context) <-chan EventInfo
 	Close()
 }

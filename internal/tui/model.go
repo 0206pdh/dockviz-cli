@@ -22,6 +22,7 @@ const (
 	PanelContainers Panel = iota
 	PanelNetworks
 	PanelImages
+	PanelEvents
 )
 
 // View represents the current screen displayed.
@@ -84,10 +85,15 @@ type Model struct {
 	history map[string][]float64
 
 	// Log streaming state
-	logs      []string            // accumulated log lines for the current container
-	logScroll int                 // scroll offset (0 = top, len(logs) = bottom)
+	logs      []string             // accumulated log lines for the current container
+	logScroll int                  // scroll offset (0 = top, len(logs) = bottom)
 	logCh     <-chan docker.LogLine // channel receiving live log lines
-	logCancel context.CancelFunc  // call to stop the streaming goroutine
+	logCancel context.CancelFunc   // call to stop the streaming goroutine
+
+	// Event timeline state
+	events      []docker.EventInfo    // container lifecycle events, newest first, capped at 100
+	eventCh     <-chan docker.EventInfo // channel receiving live events
+	eventCancel context.CancelFunc    // call to stop the event streaming goroutine
 }
 
 // Init implements tea.Model. It kicks off the spinner and the first data fetch.

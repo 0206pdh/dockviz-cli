@@ -15,6 +15,9 @@ import (
 // logLineMsg carries a single log line received from the streaming goroutine.
 type logLineMsg string
 
+// eventMsg carries a single Docker lifecycle event from the streaming goroutine.
+type eventMsg docker.EventInfo
+
 // Update is called by Bubble Tea whenever a message arrives.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -75,6 +78,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	// A Docker lifecycle event arrived — accumulate newest-first, cap at 100
+	case eventMsg:
+		ei := docker.EventInfo(msg)
+		m.events = append([]docker.EventInfo{ei}, m.events...)
+		if len(m.events) > 100 {
+			m.events = m.events[:100]
+		}
+		if m.eventCh != nil {
+			return m, waitForEventCmd(m.eventCh)
+		}
+		return m, nil
+
 	// Keyboard input
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -111,10 +126,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.activeView == ViewLogs {
 		switch {
 		case keyMatches(msg, km.Quit):
-			// Stop the log stream before quitting.
 			if m.logCancel != nil {
 				m.logCancel()
 				m.logCancel = nil
+			}
+			if m.eventCancel != nil {
+				m.eventCancel()
 			}
 			return m, tea.Quit
 
@@ -146,6 +163,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// --- Normal dashboard key handling ---
 	switch {
 	case keyMatches(msg, km.Quit):
+		if m.logCancel != nil {
+			m.logCancel()
+		}
+		if m.eventCancel != nil {
+			m.eventCancel()
+		}
 		return m, tea.Quit
 
 	case keyMatches(msg, km.Up):
@@ -159,8 +182,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case keyMatches(msg, km.Tab):
-		m.activePanel = (m.activePanel + 1) % 3
+		m.activePanel = (m.activePanel + 1) % 4
 		m.cursor = 0
+		// Start event streaming the first time the Events panel is opened.
+		if m.activePanel == PanelEvents && m.eventCancel == nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			m.eventCh = m.docker.StreamEvents(ctx)
+			m.eventCancel = cancel
+			return m, waitForEventCmd(m.eventCh)
+		}
 
 	case keyMatches(msg, km.Refresh):
 		m.refreshing = true
@@ -261,6 +291,18 @@ func waitForLogCmd(ch <-chan docker.LogLine) tea.Cmd {
 	}
 }
 
+// waitForEventCmd blocks until the next event arrives on ch, then emits it as an eventMsg.
+// Returns nil when the channel is closed.
+func waitForEventCmd(ch <-chan docker.EventInfo) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return eventMsg(ev)
+	}
+}
+
 // --- helpers ---
 
 func (m Model) activeListLen() int {
@@ -271,6 +313,8 @@ func (m Model) activeListLen() int {
 		return len(m.networks)
 	case PanelImages:
 		return len(m.images)
+	case PanelEvents:
+		return len(m.events)
 	}
 	return 0
 }
