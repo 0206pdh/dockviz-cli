@@ -95,8 +95,8 @@ func (m Model) renderConfirmDelete(name, kind string) string {
 }
 
 // renderTabs shows the panel switcher.
-// Active tab: bright cyan background, bold black text, surrounded by [ ] brackets.
-// Inactive tab: plain dim text, no background, clearly different.
+// Active tab: bright cyan background, bold black text, surrounded by ▶◀.
+// Inactive tab: plain dim text.
 func (m Model) renderTabs() string {
 	type tabDef struct {
 		label string
@@ -106,6 +106,7 @@ func (m Model) renderTabs() string {
 		{" 📦 Containers ", PanelContainers},
 		{" 🌐 Networks ", PanelNetworks},
 		{" 🗃  Images ", PanelImages},
+		{" 📋 Events ", PanelEvents},
 	}
 
 	var parts []string
@@ -139,6 +140,8 @@ func (m Model) renderActivePanel() string {
 		return m.renderNetworks()
 	case PanelImages:
 		return m.renderImages()
+	case PanelEvents:
+		return m.renderEvents()
 	default:
 		return m.renderContainers()
 	}
@@ -209,11 +212,101 @@ func (m Model) renderContainers() string {
 	return strings.Join(rows, "\n")
 }
 
-// renderNetworks builds the network topology view.
+// renderNetworks shows a two-part view: a network list at the top and a detail
+// panel for the selected network at the bottom, including container IPs and status.
 func (m Model) renderNetworks() string {
-	header := ui.HeaderStyle.Render("  Network Topology")
-	graph := ui.RenderNetworkGraph(m.networks)
-	return header + "\n\n" + graph
+	header := ui.HeaderStyle.Render(
+		fmt.Sprintf("  %-22s %-10s %-20s %-5s", "NETWORK", "DRIVER", "SUBNET", "CTRS"),
+	)
+
+	var rows []string
+	rows = append(rows, header)
+
+	for i, n := range m.networks {
+		cursor := "  "
+		if i == m.cursor {
+			cursor = "▶ "
+		}
+		subnet := n.Subnet
+		if subnet == "" {
+			subnet = "—"
+		}
+		row := fmt.Sprintf("%s%-22s %-10s %-20s %d",
+			cursor,
+			truncate(n.Name, 22),
+			truncate(n.Driver, 10),
+			truncate(subnet, 20),
+			len(n.Containers),
+		)
+		if i == m.cursor {
+			row = ui.SelectedRowStyle.Render(row)
+		}
+		rows = append(rows, row)
+	}
+
+	if len(m.networks) == 0 {
+		rows = append(rows, "\n  No networks found.")
+		return strings.Join(rows, "\n")
+	}
+
+	// Detail panel for the selected network.
+	if m.cursor < len(m.networks) {
+		n := m.networks[m.cursor]
+		rows = append(rows, "")
+
+		// Divider line with network info embedded.
+		dividerTitle := fmt.Sprintf(" %s  %s", n.Name, n.Driver)
+		if n.Subnet != "" {
+			dividerTitle += "  " + n.Subnet
+		}
+		dividerTitle += " "
+		dividerLine := lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true).Render("  ──"+dividerTitle) +
+			lipgloss.NewStyle().Foreground(ui.ColorGray).Render(strings.Repeat("─", 36))
+		rows = append(rows, dividerLine)
+
+		if len(n.Containers) == 0 {
+			rows = append(rows, lipgloss.NewStyle().Foreground(ui.ColorGray).Render("    (no containers attached)"))
+		} else {
+			// Build a name→status map from the live container list.
+			statusMap := make(map[string]string, len(m.containers))
+			for _, c := range m.containers {
+				statusMap[c.Name] = c.Status
+			}
+			// Sub-header for the detail section.
+			subHeader := lipgloss.NewStyle().Foreground(ui.ColorGray).Render(
+				fmt.Sprintf("    %-22s %-18s %s", "CONTAINER", "IPv4", "STATUS"),
+			)
+			rows = append(rows, subHeader)
+
+			for j, ep := range n.Containers {
+				status := statusMap[ep.Name]
+				ipv4 := ep.IPv4
+				if ipv4 == "" {
+					ipv4 = "—"
+				}
+
+				// Connector symbol: └─ for last item, ├─ for others.
+				connector := "├─"
+				if j == len(n.Containers)-1 {
+					connector = "└─"
+				}
+				connStyle := lipgloss.NewStyle().Foreground(ui.ColorGray).Render("    " + connector + " ")
+
+				// Status icon + name
+				icon := ui.StatusIcon(status)
+				iconStr := ui.StatusStyle(status).Render(icon)
+
+				nameStr := fmt.Sprintf("%-20s", truncate(ep.Name, 20))
+				ipStr := fmt.Sprintf("%-18s", ipv4)
+				statusStr := ui.StatusStyle(status).Render(status)
+
+				line := connStyle + iconStr + " " + nameStr + " " + ipStr + " " + statusStr
+				rows = append(rows, line)
+			}
+		}
+	}
+
+	return strings.Join(rows, "\n")
 }
 
 // renderImages builds the image list table.
@@ -237,6 +330,78 @@ func (m Model) renderImages() string {
 		rows = append(rows, row)
 	}
 	return strings.Join(rows, "\n")
+}
+
+// renderEvents shows a live-updating timeline of Docker container lifecycle events.
+// Events are displayed newest-first. The panel starts streaming when first visited.
+func (m Model) renderEvents() string {
+	header := ui.HeaderStyle.Render(
+		fmt.Sprintf("  %-10s %-14s %-22s %-12s", "TIME", "ACTION", "CONTAINER", "ID"),
+	)
+
+	var rows []string
+	rows = append(rows, header)
+
+	if len(m.events) == 0 {
+		hint := "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).Render("Waiting for Docker events...")
+		rows = append(rows, hint)
+		return strings.Join(rows, "\n")
+	}
+
+	// Cap visible rows to the available terminal height.
+	maxVisible := m.height - 9
+	if maxVisible < 5 {
+		maxVisible = 5
+	}
+	events := m.events
+	if len(events) > maxVisible {
+		events = events[:maxVisible]
+	}
+
+	for _, e := range events {
+		timeStr := e.Time.Format("15:04:05")
+
+		// Pre-pad the action field (icon + text) to a fixed width before colorising,
+		// so subsequent columns stay aligned despite ANSI codes.
+		icon, style := eventActionStyle(e.Action)
+		actionText := fmt.Sprintf("%-12s", icon+" "+e.Action)
+		actionStr := style.Render(actionText)
+
+		row := fmt.Sprintf("  %-10s %s %-22s %-12s",
+			timeStr,
+			actionStr,
+			truncate(e.ContainerName, 22),
+			e.ContainerID,
+		)
+		rows = append(rows, row)
+	}
+
+	// Live indicator in the last line.
+	liveHint := "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).
+		Render(fmt.Sprintf("● live  •  %d events", len(m.events)))
+	rows = append(rows, liveHint)
+
+	return strings.Join(rows, "\n")
+}
+
+// eventActionStyle returns the icon and lip gloss style for a given Docker event action.
+func eventActionStyle(action string) (string, lipgloss.Style) {
+	switch action {
+	case "start", "unpause":
+		return "●", lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	case "die", "kill", "stop":
+		return "○", lipgloss.NewStyle().Foreground(ui.ColorRed)
+	case "pause":
+		return "◑", lipgloss.NewStyle().Foreground(ui.ColorYellow)
+	case "restart":
+		return "↻", lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	case "create":
+		return "✦", lipgloss.NewStyle().Foreground(ui.ColorGray)
+	case "destroy":
+		return "✕", lipgloss.NewStyle().Foreground(ui.ColorRed)
+	default:
+		return "•", lipgloss.NewStyle().Foreground(ui.ColorGray)
+	}
 }
 
 // renderDetail shows detailed info for the selected container.
@@ -322,10 +487,20 @@ func colorLogLine(line string) string {
 	}
 }
 
-// renderFooter shows the keybinding hints at the bottom split across two lines.
+// renderFooter shows the keybinding hints at the bottom, adapted to the active panel.
 func (m Model) renderFooter() string {
-	line1 := "[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [Enter] Detail  [r] Refresh"
-	line2 := "[s] Start/Stop  [d] Delete  [l] Logs (Containers)"
+	line1 := "[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [r] Refresh"
+	var line2 string
+	switch m.activePanel {
+	case PanelContainers:
+		line2 = "[Enter] Detail  [s] Start/Stop  [d] Delete  [l] Logs"
+	case PanelNetworks:
+		line2 = "[↑↓] Select network  ·  detail panel updates below"
+	case PanelImages:
+		line2 = "[d] Delete image"
+	case PanelEvents:
+		line2 = "● live streaming  ·  events appear as they happen"
+	}
 	return "\n" + ui.FooterStyle.Render(line1) + "\n" + ui.FooterStyle.Render(line2)
 }
 

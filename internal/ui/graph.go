@@ -1,5 +1,4 @@
-// graph.go renders an ASCII network topology graph.
-// Each network is shown as a labeled row with containers joined by dashes.
+// graph.go renders Docker network topology as ASCII art.
 package ui
 
 import (
@@ -9,7 +8,8 @@ import (
 	"github.com/0206pdh/dockviz-cli/internal/docker"
 )
 
-// RenderNetworkGraph builds a multi-line ASCII representation of Docker networks.
+// RenderNetworkGraph builds a compact ASCII representation of Docker networks.
+// Used as a fallback; the TUI renders a richer view directly.
 //
 // Example output:
 //
@@ -27,7 +27,11 @@ func RenderNetworkGraph(networks []docker.NetworkInfo) string {
 			sb.WriteString(label + ": (no containers)\n")
 			continue
 		}
-		sb.WriteString(label + ": " + strings.Join(n.Containers, " \u2500\u2500\u2500 ") + "\n")
+		names := make([]string, len(n.Containers))
+		for i, ep := range n.Containers {
+			names[i] = ep.Name
+		}
+		sb.WriteString(label + ": " + strings.Join(names, " \u2500\u2500\u2500 ") + "\n")
 	}
 	return sb.String()
 }

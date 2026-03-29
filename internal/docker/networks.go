@@ -2,18 +2,27 @@
 package docker
 
 import (
+	"strings"
+
 	"github.com/docker/docker/api/types/network"
 )
 
-// NetworkInfo represents one Docker network and the containers attached to it.
+// ContainerEndpoint holds a container attached to a network with its IPv4 address on that network.
+type ContainerEndpoint struct {
+	Name string
+	IPv4 string // e.g. "172.20.0.2" (empty for host/none drivers)
+}
+
+// NetworkInfo represents one Docker network with its IPAM config and attached containers.
 type NetworkInfo struct {
 	ID         string
 	Name       string
-	Driver     string   // bridge, host, overlay, etc.
-	Containers []string // container names on this network
+	Driver     string
+	Subnet     string              // e.g. "172.20.0.0/16" (empty if no IPAM config)
+	Containers []ContainerEndpoint // containers attached to this network
 }
 
-// ListNetworks returns all Docker networks with their connected containers.
+// ListNetworks returns all Docker networks with their connected containers and IPAM metadata.
 func (c *Client) ListNetworks() ([]NetworkInfo, error) {
 	networks, err := c.cli.NetworkList(c.ctx, network.ListOptions{})
 	if err != nil {
@@ -22,15 +31,32 @@ func (c *Client) ListNetworks() ([]NetworkInfo, error) {
 
 	result := make([]NetworkInfo, 0, len(networks))
 	for _, n := range networks {
-		containers := make([]string, 0, len(n.Containers))
-		for _, ep := range n.Containers {
-			containers = append(containers, ep.Name)
+		// Extract subnet from IPAM config.
+		subnet := ""
+		if len(n.IPAM.Config) > 0 {
+			subnet = n.IPAM.Config[0].Subnet
 		}
+
+		// Extract containers with their IPv4 addresses.
+		// IPv4Address comes as "172.20.0.2/16" — strip the CIDR mask.
+		endpoints := make([]ContainerEndpoint, 0, len(n.Containers))
+		for _, ep := range n.Containers {
+			ipv4 := ep.IPv4Address
+			if idx := strings.Index(ipv4, "/"); idx != -1 {
+				ipv4 = ipv4[:idx]
+			}
+			endpoints = append(endpoints, ContainerEndpoint{
+				Name: ep.Name,
+				IPv4: ipv4,
+			})
+		}
+
 		result = append(result, NetworkInfo{
 			ID:         n.ID[:12],
 			Name:       n.Name,
 			Driver:     n.Driver,
-			Containers: containers,
+			Subnet:     subnet,
+			Containers: endpoints,
 		})
 	}
 	return result, nil

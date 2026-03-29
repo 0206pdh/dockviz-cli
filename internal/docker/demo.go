@@ -84,26 +84,37 @@ func (d *DemoClient) ListContainers() ([]ContainerInfo, error) {
 	}, nil
 }
 
-// ListNetworks returns fake network topology data.
+// ListNetworks returns fake network topology data with IPAM metadata.
 func (d *DemoClient) ListNetworks() ([]NetworkInfo, error) {
 	return []NetworkInfo{
 		{
-			ID:         "net001aabbcc",
-			Name:       "app-network",
-			Driver:     "bridge",
-			Containers: []string{"nginx-proxy", "api-server", "worker"},
+			ID:     "net001aabbcc",
+			Name:   "app-network",
+			Driver: "bridge",
+			Subnet: "172.20.0.0/16",
+			Containers: []ContainerEndpoint{
+				{Name: "nginx-proxy", IPv4: "172.20.0.2"},
+				{Name: "api-server", IPv4: "172.20.0.3"},
+				{Name: "worker", IPv4: "172.20.0.4"},
+			},
 		},
 		{
-			ID:         "net002bbccdd",
-			Name:       "db-network",
-			Driver:     "bridge",
-			Containers: []string{"api-server", "postgres-db", "redis-cache"},
+			ID:     "net002bbccdd",
+			Name:   "db-network",
+			Driver: "bridge",
+			Subnet: "172.21.0.0/16",
+			Containers: []ContainerEndpoint{
+				{Name: "api-server", IPv4: "172.21.0.2"},
+				{Name: "postgres-db", IPv4: "172.21.0.3"},
+				{Name: "redis-cache", IPv4: "172.21.0.4"},
+			},
 		},
 		{
 			ID:         "net003ccddef",
 			Name:       "host",
 			Driver:     "host",
-			Containers: []string{},
+			Subnet:     "",
+			Containers: []ContainerEndpoint{},
 		},
 	}, nil
 }
@@ -187,6 +198,63 @@ func (d *DemoClient) StreamLogs(ctx context.Context, id string) <-chan LogLine {
 func wave(t, base, amp float64, phase int) float64 {
 	v := base + amp*math.Sin(t*0.3+float64(phase))
 	return math.Max(0, v)
+}
+
+// StreamEvents emits a sequence of realistic fake Docker events for demo mode.
+// It first sends a batch of historical events, then generates new events every few seconds.
+func (d *DemoClient) StreamEvents(ctx context.Context) <-chan EventInfo {
+	ch := make(chan EventInfo, 64)
+	go func() {
+		defer close(ch)
+		now := time.Now()
+		initial := []EventInfo{
+			{Time: now.Add(-8 * time.Minute), Action: "create", ContainerName: "nginx-proxy", ContainerID: "a1b2c3d4e5f6"},
+			{Time: now.Add(-8 * time.Minute), Action: "start", ContainerName: "nginx-proxy", ContainerID: "a1b2c3d4e5f6"},
+			{Time: now.Add(-7 * time.Minute), Action: "create", ContainerName: "postgres-db", ContainerID: "c3d4e5f6a1b2"},
+			{Time: now.Add(-7 * time.Minute), Action: "start", ContainerName: "postgres-db", ContainerID: "c3d4e5f6a1b2"},
+			{Time: now.Add(-6 * time.Minute), Action: "create", ContainerName: "redis-cache", ContainerID: "d4e5f6a1b2c3"},
+			{Time: now.Add(-6 * time.Minute), Action: "start", ContainerName: "redis-cache", ContainerID: "d4e5f6a1b2c3"},
+			{Time: now.Add(-5 * time.Minute), Action: "create", ContainerName: "api-server", ContainerID: "b2c3d4e5f6a1"},
+			{Time: now.Add(-5 * time.Minute), Action: "start", ContainerName: "api-server", ContainerID: "b2c3d4e5f6a1"},
+			{Time: now.Add(-4 * time.Minute), Action: "create", ContainerName: "worker", ContainerID: "e5f6a1b2c3d4"},
+			{Time: now.Add(-4 * time.Minute), Action: "start", ContainerName: "worker", ContainerID: "e5f6a1b2c3d4"},
+			{Time: now.Add(-2 * time.Minute), Action: "create", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5"},
+			{Time: now.Add(-2 * time.Minute), Action: "start", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5"},
+			{Time: now.Add(-1 * time.Minute), Action: "die", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5"},
+			{Time: now.Add(-55 * time.Second), Action: "destroy", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5"},
+		}
+		for _, e := range initial {
+			select {
+			case ch <- e:
+			case <-ctx.Done():
+				return
+			}
+		}
+		// Generate live events periodically to demonstrate real-time streaming.
+		names := []string{"nginx-proxy", "api-server", "postgres-db", "redis-cache", "worker"}
+		ids := []string{"a1b2c3d4e5f6", "b2c3d4e5f6a1", "c3d4e5f6a1b2", "d4e5f6a1b2c3", "e5f6a1b2c3d4"}
+		liveActions := []string{"restart", "die", "start", "kill", "pause", "unpause"}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				i := rand.Intn(len(names))
+				j := rand.Intn(len(liveActions))
+				select {
+				case ch <- EventInfo{
+					Time:          time.Now(),
+					Action:        liveActions[j],
+					ContainerName: names[i],
+					ContainerID:   ids[i],
+				}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return ch
 }
 
 // Fmt helper used internally
