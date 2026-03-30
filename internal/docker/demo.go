@@ -121,12 +121,13 @@ func (d *DemoClient) ListNetworks() ([]NetworkInfo, error) {
 // ListImages returns fake image data.
 func (d *DemoClient) ListImages() ([]ImageInfo, error) {
 	return []ImageInfo{
-		{ID: "sha256:a1b2c3d4", Tags: "nginx:1.25-alpine", SizeMB: 41},
-		{ID: "sha256:b2c3d4e5", Tags: "node:20-alpine", SizeMB: 178},
-		{ID: "sha256:c3d4e5f6", Tags: "postgres:16", SizeMB: 425},
-		{ID: "sha256:d4e5f6a1", Tags: "redis:7-alpine", SizeMB: 34},
-		{ID: "sha256:e5f6a1b2", Tags: "myapp/worker:latest", SizeMB: 312},
-		{ID: "sha256:f6a1b2c3", Tags: "myapp/migrate:v2.1.0", SizeMB: 98},
+		{ID: "sha256:a1b2c3d4", Tag: "nginx:1.25-alpine", AllTags: []string{"nginx:1.25-alpine", "nginx:latest"}, SizeMB: 41},
+		{ID: "sha256:a1b2c3d4", Tag: "nginx:latest", AllTags: []string{"nginx:1.25-alpine", "nginx:latest"}, SizeMB: 41},
+		{ID: "sha256:b2c3d4e5", Tag: "node:20-alpine", SizeMB: 178},
+		{ID: "sha256:c3d4e5f6", Tag: "postgres:16", SizeMB: 425},
+		{ID: "sha256:d4e5f6a1", Tag: "redis:7-alpine", SizeMB: 34},
+		{ID: "sha256:e5f6a1b2", Tag: "myapp/worker:latest", SizeMB: 312},
+		{ID: "sha256:f6a1b2c3", Tag: "myapp/migrate:v2.1.0", SizeMB: 98},
 	}, nil
 }
 

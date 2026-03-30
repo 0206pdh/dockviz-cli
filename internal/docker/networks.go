@@ -2,6 +2,7 @@
 package docker
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/docker/docker/api/types/network"
@@ -59,5 +60,17 @@ func (c *Client) ListNetworks() ([]NetworkInfo, error) {
 			Containers: endpoints,
 		})
 	}
+	sysOrder := map[string]int{"bridge": 0, "host": 1, "none": 2}
+	sort.SliceStable(result, func(i, j int) bool {
+		ri, iSys := sysOrder[result[i].Name]
+		rj, jSys := sysOrder[result[j].Name]
+		if iSys != jSys {
+			return !iSys
+		}
+		if iSys {
+			return ri < rj
+		}
+		return result[i].Name < result[j].Name
+	})
 	return result, nil
 }

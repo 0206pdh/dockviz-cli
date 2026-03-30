@@ -254,7 +254,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmDelete = true
 		}
 		if m.activePanel == PanelImages && len(m.images) > 0 {
-			m.pendingDeleteID = m.images[m.cursor].ID
+			img := m.images[m.cursor]
+			ref := img.Tag
+			if ref == "<none>" {
+				ref = img.ID
+			}
+			m.pendingDeleteID = ref
 			m.confirmDelete = true
 		}
 

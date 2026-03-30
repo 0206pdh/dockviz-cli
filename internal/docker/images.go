@@ -3,47 +3,52 @@ package docker
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/docker/docker/api/types/image"
 )
 
-// ImageInfo holds display data for one Docker image.
+// ImageInfo holds display data for one Docker image row (one tag per row).
 type ImageInfo struct {
-	ID   string
-	Tags string  // comma-separated repo:tag
-	SizeMB float64
+	ID      string
+	Tag     string   // 이 행의 단일 태그, 또는 "<none>"
+	AllTags []string // 이 image ID의 모든 태그 (삭제 경고 표시용)
+	SizeMB  float64
 }
 
-// ListImages returns all locally available Docker images.
+// ListImages returns all locally available Docker images, one row per tag.
 func (c *Client) ListImages() ([]ImageInfo, error) {
 	images, err := c.cli.ImageList(c.ctx, image.ListOptions{All: false})
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]ImageInfo, 0, len(images))
+	var result []ImageInfo
 	for _, img := range images {
-		tags := strings.Join(img.RepoTags, ", ")
-		if tags == "" {
-			tags = "<none>"
-		}
 		id := img.ID
 		if strings.HasPrefix(id, "sha256:") {
-			id = id[7:19] // short ID
+			id = id[7:19]
 		}
-		result = append(result, ImageInfo{
-			ID:     id,
-			Tags:   tags,
-			SizeMB: float64(img.Size) / 1024 / 1024,
-		})
+		size := float64(img.Size) / 1024 / 1024
+		tags := img.RepoTags
+		if len(tags) == 0 {
+			result = append(result, ImageInfo{ID: id, Tag: "<none>", SizeMB: size})
+			continue
+		}
+		for _, tag := range tags {
+			result = append(result, ImageInfo{ID: id, Tag: tag, AllTags: tags, SizeMB: size})
+		}
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Tag < result[j].Tag
+	})
 	return result, nil
 }
 
-// RemoveImage removes a local image (force, to handle tagged images).
+// RemoveImage removes a local image by tag name (safe default: only removes that tag).
 func (c *Client) RemoveImage(id string) error {
-	_, err := c.cli.ImageRemove(c.ctx, id, image.RemoveOptions{Force: true})
+	_, err := c.cli.ImageRemove(c.ctx, id, image.RemoveOptions{Force: false})
 	return err
 }
 
