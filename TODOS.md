@@ -14,9 +14,9 @@ Items deferred from engineering review (2026-03-30) and design doc.
 
 **Cons:** Goroutine complexity increases; requires Bubble Tea message integration for per-container stat updates.
 
-**Context:** Currently the plan is to call FetchStats in parallel goroutines (N+1 solved with concurrency). Streaming would be a further improvement where Docker pushes rather than we poll. Evaluate at v0.3.0 — the parallel goroutine approach may be sufficient for the portfolio use case.
+**Context:** Parallel goroutine approach (N+1 solved with concurrency) was implemented in v0.2.0. Streaming would be a further improvement. Evaluate at v0.4.0.
 
-**Depends on:** FetchStats parallel goroutine implementation (v0.2.0 bug fix) completed first.
+**Status:** Deferred → v0.4.0
 
 ---
 
@@ -28,24 +28,20 @@ Items deferred from engineering review (2026-03-30) and design doc.
 
 **Pros:** Improves DevOps usability; on-call engineers can focus on failure-relevant events only.
 
-**Cons:** Requires UX design (filter input overlay or toggle keys). Outside v0.2.0 scope.
+**Cons:** Requires UX design (filter input overlay or toggle keys).
 
-**Context:** Explicitly deferred to v0.3.0 in design doc (`docs/design-v0.2.0-failure-propagation.md`).
+**Context:** The per-network timeline in v0.3.0 already provides implicit filtering. A global filter UI remains useful for the Events tab.
 
-**Depends on:** v0.2.0 Events streaming at Init complete.
+**Status:** Deferred → v0.4.0
 
 ---
 
 ## T-003: `--demo` crash scenario simulation
 
-**What:** Animate a container crash (die → restart cycle) in demo mode with realistic EventInfo and ContainerState updates.
+**What:** Animate a die → restart cycle in demo mode on a timer so the topology node colour change is visible in a recording without a live Docker environment.
 
-**Why:** Portfolio demo viewers need to see the real-time topology + event correlation in a single screenshot or GIF without needing a live Docker environment.
+**Why:** Portfolio demo viewers need to see real-time topology + event correlation in a GIF without Docker running.
 
-**Pros:** Makes the crash-visualization feature demonstrable without a live Docker environment.
+**Context:** v0.3.0 now emits realistic ExitCode/OOMKilled on random die events. A scripted die → restart cycle with fixed timing would make it fully GIF-recordable.
 
-**Cons:** demo.go grows more complex; needs to emit die/restart events on a timer.
-
-**Context:** Deferred to v0.3.0 in design doc. Only meaningful after v0.2.0 ContainerState + topology split view is implemented — without those, the demo would show events but no topology node color change.
-
-**Depends on:** v0.2.0 ContainerState + graph split view complete.
+**Status:** Partially addressed in v0.3.0 (realistic exit codes). Scripted cycle → v0.4.0
