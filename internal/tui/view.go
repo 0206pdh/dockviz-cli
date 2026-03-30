@@ -214,6 +214,11 @@ func (m Model) renderContainers() string {
 
 // renderNetworks shows a two-part view: a network list at the top and a detail
 // panel for the selected network at the bottom, including container IPs and status.
+//
+// TODO(v0.2.0): replace with a split topology/timeline layout.
+// Guard: if m.width < 80, fall back to vertical stack; if m.width == 0 (before
+// first WindowSizeMsg), render list only to avoid layout corruption on narrow
+// SSH terminals.
 func (m Model) renderNetworks() string {
 	header := ui.HeaderStyle.Render(
 		fmt.Sprintf("  %-22s %-10s %-20s %-5s", "NETWORK", "DRIVER", "SUBNET", "CTRS"),
@@ -376,9 +381,15 @@ func (m Model) renderEvents() string {
 		rows = append(rows, row)
 	}
 
-	// Live indicator in the last line.
-	liveHint := "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).
-		Render(fmt.Sprintf("● live  •  %d events", len(m.events)))
+	// Live / disconnected indicator in the last line.
+	var liveHint string
+	if m.eventDisconnected {
+		liveHint = "\n  " + lipgloss.NewStyle().Foreground(ui.ColorRed).
+			Render("○ disconnected  •  press [r] to reconnect")
+	} else {
+		liveHint = "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).
+			Render(fmt.Sprintf("● live  •  %d events", len(m.events)))
+	}
 	rows = append(rows, liveHint)
 
 	return strings.Join(rows, "\n")

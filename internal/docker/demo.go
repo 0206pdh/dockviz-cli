@@ -4,7 +4,6 @@ package docker
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -257,5 +256,3 @@ func (d *DemoClient) StreamEvents(ctx context.Context) <-chan EventInfo {
 	return ch
 }
 
-// Fmt helper used internally
-var _ = fmt.Sprintf

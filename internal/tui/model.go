@@ -8,6 +8,7 @@ package tui
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -91,20 +92,27 @@ type Model struct {
 	logCancel context.CancelFunc   // call to stop the streaming goroutine
 
 	// Event timeline state
-	events      []docker.EventInfo    // container lifecycle events, newest first, capped at 100
-	eventCh     <-chan docker.EventInfo // channel receiving live events
-	eventCancel context.CancelFunc    // call to stop the event streaming goroutine
+	events             []docker.EventInfo    // container lifecycle events, newest first, capped at 100
+	eventCh            <-chan docker.EventInfo // channel receiving live events
+	eventCancel        context.CancelFunc    // call to stop the event streaming goroutine
+	eventDisconnected  bool                  // true when the daemon dropped the event stream
 }
 
-// Init implements tea.Model. It kicks off the spinner and the first data fetch.
+// Init implements tea.Model. Starts the spinner, first data fetch, and event streaming.
+// Event streaming begins immediately so the timeline is populated from app launch —
+// not deferred to the first Events tab visit.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, fetchDataCmd(m.docker), tickCmd())
+	return tea.Batch(m.spinner.Tick, fetchDataCmd(m.docker), tickCmd(), waitForEventCmd(m.eventCh))
 }
 
 // newModel creates the initial Model. Accepts any DockerClient (real or demo).
+// Event streaming is started here so Init() can register the first waitForEventCmd.
 func newModel(dc docker.DockerClient, version string) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
+
+	eventCtx, eventCancel := context.WithCancel(context.Background())
+	eventCh := dc.StreamEvents(eventCtx)
 
 	return Model{
 		version:     version,
@@ -115,6 +123,8 @@ func newModel(dc docker.DockerClient, version string) Model {
 		spinner:     sp,
 		loading:     true,
 		history:     make(map[string][]float64),
+		eventCh:     eventCh,
+		eventCancel: eventCancel,
 	}
 }
 
@@ -125,21 +135,60 @@ func tickCmd() tea.Cmd {
 	})
 }
 
-// fetchDataCmd fetches all Docker data off the main goroutine and returns a dataMsg.
+// fetchDataCmd fetches all Docker data concurrently and returns a dataMsg.
+// Containers, networks, and images are fetched in parallel goroutines.
+// For running containers, CPU/memory stats are fetched in a second parallel pass.
 func fetchDataCmd(dc docker.DockerClient) tea.Cmd {
 	return func() tea.Msg {
-		containers, err := dc.ListContainers()
-		if err != nil {
-			return dataMsg{err: err}
+		var (
+			containers []docker.ContainerInfo
+			networks   []docker.NetworkInfo
+			images     []docker.ImageInfo
+			cErr, nErr, iErr error
+		)
+
+		var wg sync.WaitGroup
+		wg.Add(3)
+		go func() { defer wg.Done(); containers, cErr = dc.ListContainers() }()
+		go func() { defer wg.Done(); networks, nErr = dc.ListNetworks() }()
+		go func() { defer wg.Done(); images, iErr = dc.ListImages() }()
+		wg.Wait()
+
+		if cErr != nil {
+			return dataMsg{err: cErr}
 		}
-		networks, err := dc.ListNetworks()
-		if err != nil {
-			return dataMsg{err: err}
+		if nErr != nil {
+			return dataMsg{err: nErr}
 		}
-		images, err := dc.ListImages()
-		if err != nil {
-			return dataMsg{err: err}
+		if iErr != nil {
+			return dataMsg{err: iErr}
 		}
+
+		// Fetch CPU/memory stats for running containers in parallel.
+		// Errors are silently ignored — the list remains visible with zero stats
+		// rather than blocking the whole refresh.
+		var statsMu sync.Mutex
+		var statsWg sync.WaitGroup
+		for i, c := range containers {
+			if c.Status != "running" {
+				continue
+			}
+			statsWg.Add(1)
+			i, c := i, c
+			go func() {
+				defer statsWg.Done()
+				cpu, mem, err := dc.FetchStats(c.ID)
+				if err != nil {
+					return
+				}
+				statsMu.Lock()
+				containers[i].CPUPerc = cpu
+				containers[i].MemMB = mem
+				statsMu.Unlock()
+			}()
+		}
+		statsWg.Wait()
+
 		return dataMsg{
 			containers: containers,
 			networks:   networks,
