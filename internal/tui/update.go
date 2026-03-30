@@ -90,6 +90,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.events) > 100 {
 			m.events = m.events[:100]
 		}
+
+		// Update ContainerStates based on the event action.
+		// State transition table mirrors the one in internal/docker/state.go.
+		switch ei.Action {
+		case "start":
+			m.ContainerStates[ei.ContainerName] = docker.ContainerState{
+				Status:    "running",
+				UpdatedAt: ei.Time,
+			}
+		case "restart":
+			cs := m.ContainerStates[ei.ContainerName]
+			cs.Status = "restarting"
+			cs.RestartCount++
+			cs.UpdatedAt = ei.Time
+			m.ContainerStates[ei.ContainerName] = cs
+		case "die":
+			m.ContainerStates[ei.ContainerName] = docker.ContainerState{
+				Status:    "dead",
+				ExitCode:  ei.ExitCode,
+				OOMKilled: ei.OOMKilled,
+				UpdatedAt: ei.Time,
+			}
+		case "destroy":
+			delete(m.ContainerStates, ei.ContainerName)
+		}
+
 		if m.eventCh != nil {
 			return m, waitForEventCmd(m.eventCh)
 		}

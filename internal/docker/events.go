@@ -19,6 +19,8 @@ type EventInfo struct {
 	Action        string // start, stop, die, create, destroy, kill, restart, pause, unpause
 	ContainerName string
 	ContainerID   string // short 12-char ID
+	ExitCode      int    // populated on container/die (0=clean, 137=SIGKILL, 1=error)
+	OOMKilled     bool   // populated on container/die when oomKilled attribute is "true"
 	Disconnected  bool   // sentinel: stream was interrupted by an error
 }
 
@@ -47,12 +49,27 @@ func (c *Client) StreamEvents(ctx context.Context) <-chan EventInfo {
 				if len(id) > 12 {
 					id = id[:12]
 				}
+
+				// Parse exit code and OOM info from container/die attributes.
+				exitCode := 0
+				oomKilled := false
+				if msg.Action == "die" {
+					if ec, ok := msg.Actor.Attributes["exitCode"]; ok {
+						exitCode, _ = strconv.Atoi(ec)
+					}
+					if oom, ok := msg.Actor.Attributes["oomKilled"]; ok {
+						oomKilled = oom == "true"
+					}
+				}
+
 				select {
 				case ch <- EventInfo{
 					Time:          time.Unix(msg.Time, 0),
 					Action:        string(msg.Action),
 					ContainerName: name,
 					ContainerID:   id,
+					ExitCode:      exitCode,
+					OOMKilled:     oomKilled,
 				}:
 				case <-ctx.Done():
 					return
