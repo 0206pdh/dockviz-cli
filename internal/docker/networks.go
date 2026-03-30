@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 )
 
 // ContainerEndpoint holds a container attached to a network with its IPv4 address on that network.
@@ -24,6 +25,7 @@ type NetworkInfo struct {
 }
 
 // ListNetworks returns all Docker networks with their connected containers and IPAM metadata.
+// NetworkList does not populate the Containers field; NetworkInspect is called per network.
 func (c *Client) ListNetworks() ([]NetworkInfo, error) {
 	networks, err := c.cli.NetworkList(c.ctx, network.ListOptions{})
 	if err != nil {
@@ -32,16 +34,24 @@ func (c *Client) ListNetworks() ([]NetworkInfo, error) {
 
 	result := make([]NetworkInfo, 0, len(networks))
 	for _, n := range networks {
-		// Extract subnet from IPAM config.
-		subnet := ""
-		if len(n.IPAM.Config) > 0 {
-			subnet = n.IPAM.Config[0].Subnet
+		// NetworkList leaves Containers empty. Inspect each network to get container info.
+		detail, err := c.cli.NetworkInspect(c.ctx, n.ID, network.InspectOptions{Verbose: false})
+		if err != nil {
+			// If inspect fails (e.g. race with network deletion), use the list entry as-is.
+			if !client.IsErrNotFound(err) {
+				return nil, err
+			}
+			continue
 		}
 
-		// Extract containers with their IPv4 addresses.
+		subnet := ""
+		if len(detail.IPAM.Config) > 0 {
+			subnet = detail.IPAM.Config[0].Subnet
+		}
+
 		// IPv4Address comes as "172.20.0.2/16" — strip the CIDR mask.
-		endpoints := make([]ContainerEndpoint, 0, len(n.Containers))
-		for _, ep := range n.Containers {
+		endpoints := make([]ContainerEndpoint, 0, len(detail.Containers))
+		for _, ep := range detail.Containers {
 			ipv4 := ep.IPv4Address
 			if idx := strings.Index(ipv4, "/"); idx != -1 {
 				ipv4 = ipv4[:idx]
