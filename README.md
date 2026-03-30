@@ -20,12 +20,12 @@ Run `dockviz --demo` to try it right now without Docker.
 
 ## Features
 
-- **Real-time stats** — CPU and memory usage refreshed every 2 seconds
-- **Network topology** — ASCII graph of container-to-network relationships  
-- **Image browser** — local images with tags and sizes
-- **Container control** — start / stop / delete containers with a single key press
-- **CPU sparkline** — 10-point unicode bar graph (▁▂▃▄▅▆▇█) per container row
-- **Real-time log streaming** — `l` key opens a scrollable live log view
+- **Real-time stats** — CPU and memory usage refreshed every 2 seconds with fixed-scale sparklines (▁▂▃▄▅▆▇█)
+- **Failure propagation visualizer** — Networks tab split view: coloured topology (● running / ◑ restarting / ✗ dead) on the left, per-network event timeline with exit codes and OOM annotations on the right
+- **Event timeline** — live Docker lifecycle events (create / start / die / restart / destroy) with exit code and OOM kill detection
+- **Image browser** — one row per tag, alphabetically sorted, safe tag-by-tag deletion with multi-tag warning
+- **Container control** — start / stop / delete containers with a single key press and confirmation overlay
+- **Real-time log streaming** — `l` key opens a scrollable live log view with ERROR/WARN color coding
 - **Image pull progress** — `dockviz pull <image>` shows per-layer download bars
 - **Detail view** — per-container info (ID, image, ports, status)
 - **Demo mode** — `--demo` flag runs with simulated data, no Docker required
@@ -116,15 +116,15 @@ dockviz pull nginx:alpine
 | Key | Action |
 |-----|--------|
 | `q` / `Ctrl+C` | Quit |
-| `Tab` | Switch panel (Containers → Networks → Images) |
+| `Tab` | Switch panel (Containers → Networks → Images → Events) |
 | `↑` / `k` | Move up |
 | `↓` / `j` | Move down |
 | `Enter` | Open container detail |
 | `Esc` | Go back |
 | `s` | Start / Stop selected container |
-| `d` | Delete selected container *(with confirmation)* |
+| `d` | Delete selected container or image tag *(with confirmation)* |
 | `l` | Open live log stream |
-| `r` | Force refresh |
+| `r` | Force refresh / reconnect event stream if disconnected |
 
 ## Architecture
 
@@ -155,20 +155,22 @@ dockviz-cli/
     │   ├── client.go              # live Docker SDK wrapper
     │   ├── demo.go                # animated demo data (no daemon needed)
     │   ├── containers.go          # list, stats, start/stop/restart/delete
-    │   ├── networks.go            # network topology
-    │   ├── images.go              # image list
+    │   ├── networks.go            # network topology (NetworkInspect per network)
+    │   ├── images.go              # image list (one row per tag, sorted)
+    │   ├── state.go               # ContainerState — health derived from event stream
+    │   ├── events.go              # lifecycle event streaming (ExitCode, OOMKilled)
     │   ├── pull.go                # image pull with per-layer progress stream
-    │   └── logs.go                # container log streaming
+    │   └── logs.go                # container log streaming (stdcopy demux)
     ├── tui/
-    │   ├── model.go               # state (TEA Model)
-    │   ├── update.go              # event handling (TEA Update)
-    │   ├── view.go                # rendering (TEA View)
+    │   ├── model.go               # state (TEA Model) — ContainerStates map
+    │   ├── update.go              # event handling (TEA Update) — state transitions
+    │   ├── view.go                # rendering (TEA View) — split Networks layout
     │   ├── keymap.go              # keyboard bindings
     │   ├── pull.go                # pull progress TUI program
     │   └── start.go               # wires docker client → TUI
     └── ui/
-        ├── styles.go              # Lip Gloss color palette and styles
-        └── graph.go               # ASCII network graph renderer
+        ├── styles.go              # Lip Gloss color palette, styles, sparkline
+        └── graph.go               # topology graph with health-coloured nodes
 ```
 
 ## Tech Stack
@@ -185,15 +187,19 @@ dockviz-cli/
 
 - [x] Project scaffold and build pipeline
 - [x] Docker client wrapper with interface (live + demo mode)
-- [x] Container list panel with live stats
-- [x] Network topology ASCII graph
-- [x] Image browser panel
+- [x] Container list panel with live CPU/MEM stats (parallel fetch)
+- [x] CPU sparkline — fixed 0-100% scale, 10-point unicode bar per container
+- [x] Network topology graph with health-coloured nodes (● ◑ ✗ ○)
+- [x] Networks tab split layout — topology left, per-network event timeline right
+- [x] Container lifecycle event streaming with exit code and OOM kill detection
+- [x] ContainerState tracking — failure propagation across network topology
+- [x] Image browser — one row per tag, alphabetical order, tag-by-tag safe delete
 - [x] Container detail view
 - [x] `--demo` mode (no Docker required)
 - [x] `dockviz pull <image>` — real-time per-layer download progress
-- [x] Container delete with confirmation overlay (`d` key)
-- [x] CPU sparkline — 10-point unicode bar graph per container row
+- [x] Container / image delete with confirmation overlay (`d` key)
 - [x] Real-time log streaming with color coding (`l` key)
+- [x] Event stream disconnect detection + `r` to reconnect
 - [x] GitHub Actions release pipeline (Linux / Windows / macOS binaries on tag push)
 - [ ] Remote Docker host support (`DOCKER_HOST`)
 - [ ] Container stats history chart (full-screen)
