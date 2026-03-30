@@ -231,7 +231,39 @@ Docker 컨테이너 생명주기 이벤트(`create`, `start`, `die`, `restart`, 
 
 `dockviz --demo`는 Docker 데몬 없이 완전히 동작합니다. CPU/메모리 수치가 사인파형으로 애니메이션되어 모든 탭과 키 바인딩을 실제 환경 없이 체험할 수 있습니다.
 
-### 10. 원격 호스트 지원
+### 10. 컨테이너 셸 접속 — `e` 키
+
+실행 중인 컨테이너를 선택하고 `e`를 누르면 컨테이너 안으로 인터랙티브 셸이 열립니다. dockviz가 일시 정지되고 터미널이 셸 세션으로 전환됩니다. `exit`로 나오면 dockviz가 다시 시작됩니다.
+
+```
+  # dockviz에서 실행 중인 컨테이너 선택 후 e 키
+  # 터미널이 다음과 같이 바뀜:
+  / # ls /app
+  / # ps aux
+  / # exit
+  # dockviz 재개
+```
+
+`/bin/bash`를 먼저 시도하고 없으면 `/bin/sh`로 자동 폴백합니다. Alpine, Debian, Ubuntu 등 POSIX 셸이 있는 모든 이미지에서 동작합니다. `--host`가 설정된 경우 동일한 원격 데몬에 exec가 전달됩니다.
+
+`--demo` 모드에서는 실제 컨테이너가 없으므로 비활성화됩니다.
+
+### 11. 볼륨 마운트 표시
+
+컨테이너 상세 보기(`Enter`)에서 볼륨 마운트 정보를 확인할 수 있습니다.
+
+```
+  ID       a1b2c3d4e5f6
+  Image    postgres:16
+  Status   ● running
+  Ports    5432
+  Volumes  postgres_data → /var/lib/postgresql/data
+           /backup → /backup (ro)
+```
+
+명명 볼륨은 볼륨 이름을, 바인드 마운트는 호스트 경로를 표시합니다. 읽기 전용 마운트는 `(ro)`로 표시됩니다.
+
+### 12. 원격 호스트 지원
 
 ```bash
 dockviz --host tcp://192.168.1.100:2375
@@ -258,6 +290,7 @@ DOCKER_HOST=tcp://192.168.1.100:2375 dockviz
 | `l` | 실시간 로그 스트리밍 |
 | `r` | 강제 새로고침 / 이벤트 스트림 끊김 시 재연결 |
 | `g` | 선택한 컨테이너의 CPU/MEM 히스토리 전체 화면 차트 열기 |
+| `e` | 선택한 컨테이너 안에서 인터랙티브 셸 열기 *(실행 중인 컨테이너만)* |
 
 ---
 
@@ -337,6 +370,17 @@ type DockerClient interface {
 }
 ```
 
+### Exec 셸 동작 원리
+
+`e` 키는 `DockerClient` 인터페이스를 거치지 않습니다. `tea.ExecProcess`를 통해 시스템 `docker exec -it <name> sh` 프로세스를 직접 실행합니다. Bubble Tea 이벤트 루프가 일시 정지되고 터미널이 서브프로세스에 넘겨집니다. 셸이 종료되면 루프가 재개되고 데이터를 새로 불러옵니다.
+
+```go
+cmd := exec.Command("docker", "exec", "-it", containerName, "sh", "-c", "bash 2>/dev/null || sh")
+return tea.ExecProcess(cmd, func(err error) tea.Msg {
+    return execDoneMsg{err: err}
+})
+```
+
 ### 버전 주입
 
 바이너리 버전은 빌드 시 ldflags로 주입됩니다.
@@ -399,6 +443,8 @@ Actions 동작:
 - [x] 원격 Docker 호스트 지원 (`--host` 플래그 + `DOCKER_HOST` 환경변수)
 - [x] CPU/MEM 히스토리 전체 화면 차트 — 컨테이너별 바 차트 (`g` 키)
 - [x] 동적 CPU Y축 — 멀티코어 컨테이너에서 100% 초과 시 자동 확장
+- [x] 볼륨 마운트 표시 — 컨테이너 상세 보기에서 마운트 경로 확인
+- [x] 인터랙티브 exec 셸 — `e` 키로 TUI를 일시 정지하고 컨테이너 셸 접속
 
 ---
 

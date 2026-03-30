@@ -443,15 +443,42 @@ func eventActionStyle(action string) (string, lipgloss.Style) {
 // renderDetail shows detailed info for the selected container.
 func (m Model) renderDetail() string {
 	for _, c := range m.containers {
-		if c.ID == m.selectedID {
-			return fmt.Sprintf(
-				"\n  %s\n\n  ID:     %s\n  Image:  %s\n  Status: %s\n  Ports:  %s\n\n  [Esc] Back\n",
-				ui.TitleStyle.Render(c.Name),
-				c.ID, c.Image,
-				ui.StatusStyle(c.Status).Render(ui.StatusIcon(c.Status)+" "+c.Status),
-				c.Ports,
-			)
+		if c.ID != m.selectedID {
+			continue
 		}
+
+		label := lipgloss.NewStyle().Foreground(ui.ColorGray)
+		value := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+
+		row := func(k, v string) string {
+			return "  " + label.Render(fmt.Sprintf("%-8s", k)) + " " + value.Render(v)
+		}
+
+		lines := []string{
+			"\n  " + ui.TitleStyle.Render(c.Name),
+			"",
+			row("ID", c.ID),
+			row("Image", c.Image),
+			row("Status", ui.StatusStyle(c.Status).Render(ui.StatusIcon(c.Status)+" "+c.Status)),
+			row("Ports", c.Ports),
+		}
+
+		if len(c.Volumes) > 0 {
+			lines = append(lines, row("Volumes", c.Volumes[0]))
+			for _, v := range c.Volumes[1:] {
+				lines = append(lines, "           "+value.Render(v))
+			}
+		} else {
+			lines = append(lines, row("Volumes", "-"))
+		}
+
+		footerParts := "[Esc] Back"
+		if c.Status == "running" && !m.demo {
+			footerParts += "  •  [e] Exec shell"
+		}
+		lines = append(lines, "", "  "+ui.FooterStyle.Render(footerParts))
+
+		return strings.Join(lines, "\n")
 	}
 	return "\n  Container not found. [Esc] Back\n"
 }
@@ -529,7 +556,7 @@ func (m Model) renderFooter() string {
 	var line2 string
 	switch m.activePanel {
 	case PanelContainers:
-		line2 = "[Enter] Detail  [s] Start/Stop  [d] Delete  [l] Logs  [g] Chart"
+		line2 = "[Enter] Detail  [s] Start/Stop  [d] Delete  [l] Logs  [g] Chart  [e] Exec"
 	case PanelNetworks:
 		line2 = "● running  ◑ restarting  ✗ dead  ○ unknown  ·  [↑↓] select network"
 	case PanelImages:

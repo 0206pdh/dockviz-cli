@@ -5,6 +5,7 @@ package tui
 
 import (
 	"context"
+	"os/exec"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -14,6 +15,9 @@ import (
 
 // logLineMsg carries a single log line received from the streaming goroutine.
 type logLineMsg string
+
+// execDoneMsg is sent after the interactive exec process exits.
+type execDoneMsg struct{ err error }
 
 // eventMsg carries a single Docker lifecycle event from the streaming goroutine.
 type eventMsg docker.EventInfo
@@ -128,6 +132,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, waitForEventCmd(m.eventCh)
 		}
 		return m, nil
+
+	// Interactive exec process returned — resume TUI on the dashboard.
+	case execDoneMsg:
+		m.activeView = ViewDashboard
+		return m, fetchDataCmd(m.docker)
 
 	// Keyboard input
 	case tea.KeyMsg:
@@ -312,6 +321,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.logCancel = cancel
 			return m, waitForLogCmd(ch)
 		}
+
+	case keyMatches(msg, km.Exec):
+		// Suspend the TUI and exec an interactive shell inside the selected container.
+		// Only available for running containers; no-op in demo mode.
+		if m.activePanel == PanelContainers && len(m.containers) > 0 {
+			ctr := m.containers[m.cursor]
+			if ctr.Status == "running" && !m.demo {
+				return m, execShellCmd(ctr.Name, m.host)
+			}
+		}
 	}
 
 	return m, nil
@@ -354,6 +373,20 @@ func removeImageCmd(dc docker.DockerClient, id string) tea.Cmd {
 		}
 		return fetchDataCmd(dc)()
 	}
+}
+
+// execShellCmd suspends the TUI and opens an interactive shell inside a running container.
+// It tries /bin/bash first, falls back to /bin/sh if bash is not available.
+// When the shell exits, Bubble Tea resumes and emits execDoneMsg.
+func execShellCmd(containerName, host string) tea.Cmd {
+	args := []string{"exec", "-it", containerName, "sh", "-c", "bash 2>/dev/null || sh"}
+	if host != "" {
+		args = append([]string{"-H", host}, args...)
+	}
+	cmd := exec.Command("docker", args...)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execDoneMsg{err: err}
+	})
 }
 
 // waitForLogCmd blocks until the next line arrives on ch, then emits it as a logLineMsg.

@@ -230,7 +230,39 @@ Each layer gets its own progress bar. The overall pull completes only when all l
 
 `dockviz --demo` runs entirely without a Docker daemon. CPU and memory values animate in sine-wave patterns so you can explore every tab and key binding before connecting to a real environment.
 
-### 10. Remote host support
+### 10. Exec into container — `e` key
+
+Press `e` on any **running** container to open an interactive shell inside it. dockviz suspends, hands the terminal over to the shell session, and resumes when you exit.
+
+```
+  # In dockviz: select a running container, press e
+  # Terminal becomes:
+  / # ls /app
+  / # ps aux
+  / # exit
+  # dockviz resumes
+```
+
+Tries `/bin/bash` first, falls back to `/bin/sh` automatically — works on Alpine, Debian, Ubuntu, and any image that has a POSIX shell. If `--host` is set, the exec is forwarded to the same remote daemon.
+
+Not available in `--demo` mode (no real containers to exec into).
+
+### 11. Volume mount display
+
+The container detail view (`Enter`) shows all volume mounts:
+
+```
+  ID       a1b2c3d4e5f6
+  Image    postgres:16
+  Status   ● running
+  Ports    5432
+  Volumes  postgres_data → /var/lib/postgresql/data
+           /backup → /backup (ro)
+```
+
+Named volumes show the volume name; bind mounts show the host path. Read-only mounts are marked `(ro)`.
+
+### 12. Remote host support
 
 ```bash
 dockviz --host tcp://192.168.1.100:2375
@@ -257,6 +289,7 @@ DOCKER_HOST=tcp://192.168.1.100:2375 dockviz
 | `l` | Open live log stream |
 | `r` | Force refresh / reconnect event stream |
 | `g` | Open full-screen CPU/MEM history chart for selected container |
+| `e` | Open interactive shell inside selected container *(running only)* |
 
 ---
 
@@ -336,6 +369,17 @@ type DockerClient interface {
 }
 ```
 
+### Exec shell — how it works
+
+`e` does not go through the `DockerClient` interface. It spawns a system `docker exec -it <name> sh` process directly via `tea.ExecProcess`, which suspends the Bubble Tea event loop and hands the terminal to the subprocess. When the shell exits, the loop resumes and a fresh data fetch runs.
+
+```go
+cmd := exec.Command("docker", "exec", "-it", containerName, "sh", "-c", "bash 2>/dev/null || sh")
+return tea.ExecProcess(cmd, func(err error) tea.Msg {
+    return execDoneMsg{err: err}
+})
+```
+
 ### Version injection
 
 The binary version is injected at build time via ldflags:
@@ -398,6 +442,8 @@ The `curl` one-liner on the install section always resolves to the latest releas
 - [x] Remote Docker host support (`--host` flag + `DOCKER_HOST` env var)
 - [x] Container stats history chart — full-screen CPU/MEM bar chart (`g` key)
 - [x] Dynamic CPU Y-axis — auto-scales beyond 100% for multi-core containers
+- [x] Volume mount display in container detail view
+- [x] Interactive exec shell — `e` key suspends TUI and opens shell in container
 
 ---
 

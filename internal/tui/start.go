@@ -25,7 +25,7 @@ func Start(demo bool, host string, version string) error {
 	}
 	defer dc.Close()
 
-	m := newModel(dc, version)
+	m := newModel(dc, version, host, demo)
 
 	// Init() on the model handles the first fetch and tick automatically.
 	p := tea.NewProgram(m,

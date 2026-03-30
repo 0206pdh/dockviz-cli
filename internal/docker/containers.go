@@ -19,6 +19,7 @@ type ContainerInfo struct {
 	CPUPerc float64 // percentage 0-100
 	MemMB   float64 // megabytes
 	Ports   string  // human-readable port bindings
+	Volumes []string // mount points, e.g. ["/host/path → /ctr/path", "vol → /data:ro"]
 }
 
 // ListContainers returns all containers (running + stopped).
@@ -34,12 +35,25 @@ func (c *Client) ListContainers() ([]ContainerInfo, error) {
 		if len(ctr.Names) > 0 {
 			name = ctr.Names[0][1:] // strip leading "/"
 		}
+		var vols []string
+		for _, m := range ctr.Mounts {
+			src := m.Source
+			if src == "" {
+				src = m.Name // named volume
+			}
+			entry := src + " → " + m.Destination
+			if !m.RW {
+				entry += " (ro)"
+			}
+			vols = append(vols, entry)
+		}
 		result = append(result, ContainerInfo{
-			ID:     ctr.ID[:12],
-			Name:   name,
-			Image:  ctr.Image,
-			Status: ctr.State,
-			Ports:  formatPorts(ctr.Ports),
+			ID:      ctr.ID[:12],
+			Name:    name,
+			Image:   ctr.Image,
+			Status:  ctr.State,
+			Ports:   formatPorts(ctr.Ports),
+			Volumes: vols,
 		})
 	}
 	return result, nil

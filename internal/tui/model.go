@@ -52,6 +52,11 @@ type Model struct {
 	// Build-time version string (e.g. "v0.2.3")
 	version string
 
+	// Remote host override (empty = local daemon). Used when spawning `docker exec`.
+	host string
+	// demo is true when running with the DemoClient (no real daemon).
+	demo bool
+
 	// Docker connection (real or demo)
 	docker docker.DockerClient
 
@@ -114,7 +119,7 @@ func (m Model) Init() tea.Cmd {
 
 // newModel creates the initial Model. Accepts any DockerClient (real or demo).
 // Event streaming is started here so Init() can register the first waitForEventCmd.
-func newModel(dc docker.DockerClient, version string) Model {
+func newModel(dc docker.DockerClient, version, host string, demo bool) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 
@@ -123,6 +128,8 @@ func newModel(dc docker.DockerClient, version string) Model {
 
 	return Model{
 		version:         version,
+		host:            host,
+		demo:            demo,
 		docker:          dc,
 		activePanel:     PanelContainers,
 		activeView:      ViewDashboard,

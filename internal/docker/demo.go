@@ -36,6 +36,7 @@ func (d *DemoClient) ListContainers() ([]ContainerInfo, error) {
 			CPUPerc: wave(t, 2.1, 0.8, 0),
 			MemMB:   wave(t, 45, 5, 1),
 			Ports:   "80:80, 443:443",
+			Volumes: []string{"/etc/nginx/conf.d → /etc/nginx/conf.d (ro)", "/var/log/nginx → /var/log/nginx"},
 		},
 		{
 			ID:      "b2c3d4e5f6a1",
@@ -45,6 +46,7 @@ func (d *DemoClient) ListContainers() ([]ContainerInfo, error) {
 			CPUPerc: wave(t, 18.4, 6.0, 2),
 			MemMB:   wave(t, 210, 30, 3),
 			Ports:   "3000:3000",
+			Volumes: []string{"app_data → /app/data", "/tmp/uploads → /uploads"},
 		},
 		{
 			ID:      "c3d4e5f6a1b2",
@@ -54,6 +56,7 @@ func (d *DemoClient) ListContainers() ([]ContainerInfo, error) {
 			CPUPerc: wave(t, 0.9, 0.3, 4),
 			MemMB:   wave(t, 128, 10, 5),
 			Ports:   "5432",
+			Volumes: []string{"postgres_data → /var/lib/postgresql/data"},
 		},
 		{
 			ID:      "d4e5f6a1b2c3",
@@ -72,6 +75,7 @@ func (d *DemoClient) ListContainers() ([]ContainerInfo, error) {
 			CPUPerc: wave(t, 34.5, 12.0, 8),
 			MemMB:   wave(t, 320, 40, 9),
 			Ports:   "-",
+			Volumes: []string{"worker_queue → /queue", "/var/run/docker.sock → /var/run/docker.sock"},
 		},
 		{
 			ID:     "f6a1b2c3d4e5",
