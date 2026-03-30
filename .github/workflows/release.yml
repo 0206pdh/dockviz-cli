@@ -81,4 +81,9 @@ jobs:
         with:
           # Attach every binary found under dist/.
           files: dist/**/*
-          generate_release_notes: true
+          # Do not auto-generate notes — release notes are written manually
+          # via `gh release edit` after the CI run completes.
+          generate_release_notes: false
+          # If the release was already created manually (e.g. gh release create),
+          # only upload assets without overwriting the body or title.
+          fail_on_unmatched_files: true
