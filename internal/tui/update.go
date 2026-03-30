@@ -78,9 +78,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	// A Docker lifecycle event arrived — accumulate newest-first, cap at 100
+	// A Docker lifecycle event arrived — accumulate newest-first, cap at 100.
+	// A Disconnected sentinel means the daemon dropped the stream.
 	case eventMsg:
 		ei := docker.EventInfo(msg)
+		if ei.Disconnected {
+			m.eventDisconnected = true
+			return m, nil
+		}
 		m.events = append([]docker.EventInfo{ei}, m.events...)
 		if len(m.events) > 100 {
 			m.events = m.events[:100]
@@ -184,16 +189,21 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyMatches(msg, km.Tab):
 		m.activePanel = (m.activePanel + 1) % 4
 		m.cursor = 0
-		// Start event streaming the first time the Events panel is opened.
-		if m.activePanel == PanelEvents && m.eventCancel == nil {
-			ctx, cancel := context.WithCancel(context.Background())
-			m.eventCh = m.docker.StreamEvents(ctx)
-			m.eventCancel = cancel
-			return m, waitForEventCmd(m.eventCh)
-		}
+		// Event streaming is started in newModel/Init, so no lazy-start needed here.
 
 	case keyMatches(msg, km.Refresh):
 		m.refreshing = true
+		// If the event stream was disconnected, restart it on manual refresh.
+		if m.eventDisconnected {
+			if m.eventCancel != nil {
+				m.eventCancel()
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			m.eventCh = m.docker.StreamEvents(ctx)
+			m.eventCancel = cancel
+			m.eventDisconnected = false
+			return m, tea.Batch(fetchDataCmd(m.docker), waitForEventCmd(m.eventCh))
+		}
 		return m, fetchDataCmd(m.docker)
 
 	case keyMatches(msg, km.Back):
@@ -263,17 +273,23 @@ func toggleContainerCmd(dc docker.DockerClient, id, status string) tea.Cmd {
 }
 
 // removeContainerCmd force-removes a container then refreshes the container list.
+// If the remove fails, the error is surfaced to the dashboard via dataMsg.
 func removeContainerCmd(dc docker.DockerClient, id string) tea.Cmd {
 	return func() tea.Msg {
-		_ = dc.RemoveContainer(id)
+		if err := dc.RemoveContainer(id); err != nil {
+			return dataMsg{err: err}
+		}
 		return fetchDataCmd(dc)()
 	}
 }
 
 // removeImageCmd removes a local image then refreshes the data.
+// If the remove fails, the error is surfaced to the dashboard via dataMsg.
 func removeImageCmd(dc docker.DockerClient, id string) tea.Cmd {
 	return func() tea.Msg {
-		_ = dc.RemoveImage(id)
+		if err := dc.RemoveImage(id); err != nil {
+			return dataMsg{err: err}
+		}
 		return fetchDataCmd(dc)()
 	}
 }
@@ -292,7 +308,7 @@ func waitForLogCmd(ch <-chan docker.LogLine) tea.Cmd {
 }
 
 // waitForEventCmd blocks until the next event arrives on ch, then emits it as an eventMsg.
-// Returns nil when the channel is closed.
+// Returns nil when the channel is closed without a Disconnected sentinel.
 func waitForEventCmd(ch <-chan docker.EventInfo) tea.Cmd {
 	return func() tea.Msg {
 		ev, ok := <-ch

@@ -11,11 +11,15 @@ import (
 )
 
 // EventInfo represents a single Docker container lifecycle event.
+// When Disconnected is true, the event stream has been interrupted (daemon
+// restart, network drop, etc.) and no further events will arrive until the
+// stream is restarted. All other fields are zero in this case.
 type EventInfo struct {
 	Time          time.Time
 	Action        string // start, stop, die, create, destroy, kill, restart, pause, unpause
 	ContainerName string
 	ContainerID   string // short 12-char ID
+	Disconnected  bool   // sentinel: stream was interrupted by an error
 }
 
 // StreamEvents streams container lifecycle events from the Docker daemon.
@@ -53,7 +57,15 @@ func (c *Client) StreamEvents(ctx context.Context) <-chan EventInfo {
 				case <-ctx.Done():
 					return
 				}
-			case <-errCh:
+			case err, ok := <-errCh:
+				if ok && err != nil {
+					// Daemon dropped the stream. Send a sentinel so the TUI
+					// can display a "disconnected" indicator, then close.
+					select {
+					case ch <- EventInfo{Disconnected: true}:
+					default:
+					}
+				}
 				return
 			case <-ctx.Done():
 				return

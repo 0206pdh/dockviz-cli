@@ -90,32 +90,31 @@ func StatusIcon(state string) string {
 	}
 }
 
-// Sparkline converts a slice of float64 values (0-100) into a unicode bar string
-// using the block element characters ▁▂▃▄▅▆▇█. The result is always 10 runes wide,
-// left-padded with spaces when fewer than 10 values are provided.
+// Sparkline converts a slice of float64 CPU percentage values (0-100) into a
+// unicode bar string using the block element characters ▁▂▃▄▅▆▇█.
+// The result is always 10 runes wide, left-padded with spaces when fewer than
+// 10 values are provided.
+//
+// Values are mapped against a fixed 0-100% scale so bars reflect actual
+// CPU utilisation — a container at 5% always looks nearly empty, and one at
+// 90% always looks nearly full, regardless of other containers' activity.
 func Sparkline(values []float64) string {
 	if len(values) == 0 {
 		return "          " // 10 spaces — placeholder before any data arrives
 	}
 	bars := []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
 
-	// Determine the peak value for normalisation.
-	// Use 0.1 as the minimum to avoid division-by-zero on all-zero data.
-	max := 0.1
-	for _, v := range values {
-		if v > max {
-			max = v
-		}
-	}
-
 	result := make([]rune, len(values))
 	for i, v := range values {
-		idx := int((v / max) * float64(len(bars)-1))
+		if v < 0 {
+			v = 0
+		}
+		if v > 100 {
+			v = 100
+		}
+		idx := int((v / 100.0) * float64(len(bars)-1))
 		if idx >= len(bars) {
 			idx = len(bars) - 1
-		}
-		if idx < 0 {
-			idx = 0
 		}
 		result[i] = bars[idx]
 	}

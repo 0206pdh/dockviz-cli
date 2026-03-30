@@ -3,7 +3,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/0206pdh/dockviz-cli/internal/docker"
@@ -22,8 +21,7 @@ var pullCmd = &cobra.Command{
 
 		dc, err := docker.NewClient()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error: cannot connect to Docker daemon:", err)
-			os.Exit(1)
+			return fmt.Errorf("cannot connect to Docker daemon: %w", err)
 		}
 
 		return tui.StartPull(dc, ref)
