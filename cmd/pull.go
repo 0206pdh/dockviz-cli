@@ -19,7 +19,7 @@ var pullCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ref := args[0]
 
-		dc, err := docker.NewClient()
+		dc, err := docker.NewClient(dockerHost)
 		if err != nil {
 			return fmt.Errorf("cannot connect to Docker daemon: %w", err)
 		}

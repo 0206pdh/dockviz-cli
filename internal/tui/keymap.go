@@ -15,6 +15,7 @@ type KeyMap struct {
 	Toggle  key.Binding // start/stop container
 	Logs    key.Binding
 	Delete  key.Binding // force-remove a container
+	Chart   key.Binding // full-screen stats history chart
 	Quit    key.Binding
 }
 
@@ -56,6 +57,10 @@ func DefaultKeyMap() KeyMap {
 		Delete: key.NewBinding(
 			key.WithKeys("d"),
 			key.WithHelp("d", "delete container"),
+		),
+		Chart: key.NewBinding(
+			key.WithKeys("g"),
+			key.WithHelp("g", "stats chart"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),

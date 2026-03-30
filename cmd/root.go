@@ -11,6 +11,7 @@ import (
 )
 
 var demoMode bool
+var dockerHost string
 
 // rootCmd is the base command. Its Version field is set by Execute() before
 // the command tree is evaluated, so --version always reflects the build tag.
@@ -23,16 +24,18 @@ It shows real-time container stats, network topology, and lets you
 start/stop containers directly from the terminal.
 
 Run with --demo to preview the dashboard without a running Docker daemon.`,
-	Example: `  dockviz           # connect to local Docker daemon
-  dockviz --demo    # run with simulated data (no Docker required)
-  dockviz --version # print version and exit`,
+	Example: `  dockviz                                  # connect to local Docker daemon
+  dockviz --demo                            # run with simulated data (no Docker required)
+  dockviz --host tcp://192.168.1.100:2375   # connect to a remote Docker daemon
+  dockviz --version                         # print version and exit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return tui.Start(demoMode, cmd.Version)
+		return tui.Start(demoMode, dockerHost, cmd.Version)
 	},
 }
 
 func init() {
 	rootCmd.Flags().BoolVar(&demoMode, "demo", false, "Run with simulated data (no Docker daemon required)")
+	rootCmd.Flags().StringVar(&dockerHost, "host", "", "Docker daemon socket or host (e.g. tcp://192.168.1.100:2375). Overrides DOCKER_HOST env var.")
 }
 
 // Execute is called from main.go. It injects the build-time version string

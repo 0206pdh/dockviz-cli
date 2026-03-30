@@ -11,12 +11,13 @@ import (
 
 // Start connects to Docker (or uses demo data), builds the model, and runs the TUI.
 // Pass demo=true to run without a live Docker daemon.
-func Start(demo bool, version string) error {
+// host overrides DOCKER_HOST when non-empty (e.g. "tcp://192.168.1.100:2375").
+func Start(demo bool, host string, version string) error {
 	var dc docker.DockerClient
 	if demo {
 		dc = docker.NewDemoClient()
 	} else {
-		real, err := docker.NewClient()
+		real, err := docker.NewClient(host)
 		if err != nil {
 			return fmt.Errorf("docker: %w", err)
 		}

@@ -53,17 +53,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Clamp cursor to list length
 		m.cursor = clamp(m.cursor, 0, m.activeListLen()-1)
 
-		// Update per-container CPU sparkline history.
-		// We keep at most 10 readings per container to fit the sparkline width.
+		// Update per-container CPU and MEM history (60 readings = ~2 min at 2s refresh).
+		// The sparkline in the container list takes the last 10 entries; the
+		// full-screen chart uses all 60.
 		for _, c := range m.containers {
-			h := m.history[c.ID]
 			if c.Status == "running" {
+				h := m.history[c.ID]
 				h = append(h, c.CPUPerc)
-				if len(h) > 10 {
-					h = h[len(h)-10:]
+				if len(h) > 60 {
+					h = h[len(h)-60:]
 				}
+				m.history[c.ID] = h
+
+				mh := m.memHistory[c.ID]
+				mh = append(mh, c.MemMB)
+				if len(mh) > 60 {
+					mh = mh[len(mh)-60:]
+				}
+				m.memHistory[c.ID] = mh
 			}
-			m.history[c.ID] = h
 		}
 		return m, nil
 
@@ -149,6 +157,23 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// User cancelled.
 			m.confirmDelete = false
 			m.pendingDeleteID = ""
+		}
+		return m, nil
+	}
+
+	// --- Chart view key handling ---
+	if m.activeView == ViewChart {
+		switch {
+		case keyMatches(msg, km.Quit):
+			if m.logCancel != nil {
+				m.logCancel()
+			}
+			if m.eventCancel != nil {
+				m.eventCancel()
+			}
+			return m, tea.Quit
+		case keyMatches(msg, km.Back):
+			m.activeView = ViewDashboard
 		}
 		return m, nil
 	}
@@ -261,6 +286,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.pendingDeleteID = ref
 			m.confirmDelete = true
+		}
+
+	case keyMatches(msg, km.Chart):
+		if m.activePanel == PanelContainers && len(m.containers) > 0 {
+			m.selectedID = m.containers[m.cursor].ID
+			m.activeView = ViewChart
 		}
 
 	case keyMatches(msg, km.Logs):

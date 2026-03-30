@@ -29,6 +29,7 @@ Run `dockviz --demo` to try it right now without Docker.
 - **Image pull progress** — `dockviz pull <image>` shows per-layer download bars
 - **Detail view** — per-container info (ID, image, ports, status)
 - **Demo mode** — `--demo` flag runs with simulated data, no Docker required
+- **Remote host** — `--host tcp://host:2375` or `DOCKER_HOST` env var to connect to a remote daemon
 
 ## Installation
 
@@ -107,6 +108,12 @@ dockviz
 # Preview with simulated data — no Docker required
 dockviz --demo
 
+# Connect to a remote Docker daemon
+dockviz --host tcp://192.168.1.100:2375
+
+# Or use the standard Docker environment variable
+DOCKER_HOST=tcp://192.168.1.100:2375 dockviz
+
 # Pull an image with live layer progress
 dockviz pull nginx:alpine
 ```
@@ -125,6 +132,7 @@ dockviz pull nginx:alpine
 | `d` | Delete selected container or image tag *(with confirmation)* |
 | `l` | Open live log stream |
 | `r` | Force refresh / reconnect event stream if disconnected |
+| `g` | Open full-screen CPU/MEM history chart for selected container |
 
 ## Architecture
 
@@ -201,8 +209,8 @@ dockviz-cli/
 - [x] Real-time log streaming with color coding (`l` key)
 - [x] Event stream disconnect detection + `r` to reconnect
 - [x] GitHub Actions release pipeline (Linux / Windows / macOS binaries on tag push)
-- [ ] Remote Docker host support (`DOCKER_HOST`)
-- [ ] Container stats history chart (full-screen)
+- [x] Remote Docker host support (`--host` flag + `DOCKER_HOST` env var)
+- [x] Container stats history chart — full-screen CPU/MEM bar chart per container (`g` key)
 
 ## License
 

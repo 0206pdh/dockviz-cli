@@ -16,12 +16,17 @@ type Client struct {
 }
 
 // NewClient creates and validates a connection to the Docker daemon.
-// It reads the DOCKER_HOST environment variable or uses the default socket.
-func NewClient() (*Client, error) {
-	cli, err := client.NewClientWithOpts(
+// host overrides the DOCKER_HOST environment variable when non-empty
+// (e.g. "tcp://192.168.1.100:2375"). Pass "" to use the env var or default socket.
+func NewClient(host string) (*Client, error) {
+	opts := []client.Opt{
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
-	)
+	}
+	if host != "" {
+		opts = append(opts, client.WithHost(host))
+	}
+	cli, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Docker client: %w", err)
 	}

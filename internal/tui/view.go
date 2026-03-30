@@ -4,6 +4,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -25,6 +26,8 @@ func (m Model) View() string {
 		return m.renderDetail()
 	case ViewLogs:
 		return m.renderLogs()
+	case ViewChart:
+		return m.renderChart()
 	default:
 		return m.renderDashboard()
 	}
@@ -178,9 +181,13 @@ func (m Model) renderContainers() string {
 			mem = fmt.Sprintf("%.0fMB", c.MemMB)
 		}
 
-		// Sparkline is always 10 runes wide (padded by ui.Sparkline).
+		// Sparkline shows the last 10 readings. History stores up to 60 for the chart.
 		// Colorize after padding so ANSI codes don't shift subsequent columns.
-		spark := ui.Sparkline(m.history[c.ID])
+		h := m.history[c.ID]
+		if len(h) > 10 {
+			h = h[len(h)-10:]
+		}
+		spark := ui.Sparkline(h)
 		var sparkStr string
 		if c.Status == "running" {
 			sparkStr = lipgloss.NewStyle().Foreground(ui.ColorGreen).Render(spark)
@@ -522,7 +529,7 @@ func (m Model) renderFooter() string {
 	var line2 string
 	switch m.activePanel {
 	case PanelContainers:
-		line2 = "[Enter] Detail  [s] Start/Stop  [d] Delete  [l] Logs"
+		line2 = "[Enter] Detail  [s] Start/Stop  [d] Delete  [l] Logs  [g] Chart"
 	case PanelNetworks:
 		line2 = "● running  ◑ restarting  ✗ dead  ○ unknown  ·  [↑↓] select network"
 	case PanelImages:
@@ -531,6 +538,136 @@ func (m Model) renderFooter() string {
 		line2 = "● live streaming  ·  events appear as they happen"
 	}
 	return "\n" + ui.FooterStyle.Render(line1) + "\n" + ui.FooterStyle.Render(line2)
+}
+
+// renderChart shows a full-screen CPU and memory history chart for the selected container.
+// Press Esc to return to the dashboard. Data updates every 2 seconds (up to 60 points).
+func (m Model) renderChart() string {
+	var ctrName string
+	for _, c := range m.containers {
+		if c.ID == m.selectedID {
+			ctrName = c.Name
+			break
+		}
+	}
+	if ctrName == "" {
+		return "\n  Container not found. [Esc] Back\n"
+	}
+
+	title := ui.TitleStyle.Render(fmt.Sprintf("  Stats History — %s", ctrName))
+	footer := "\n" + ui.FooterStyle.Render("[Esc] Back  •  2s refresh  •  up to 60 data points (last 2 min)")
+
+	chartW := m.width - 14
+	if chartW < 20 {
+		chartW = 20
+	}
+	const chartH = 8
+
+	cpuSection := renderChartSection("CPU", "%", m.history[m.selectedID], 100.0, chartW, chartH)
+
+	var maxMem float64 = 10
+	for _, v := range m.memHistory[m.selectedID] {
+		if v > maxMem {
+			maxMem = v
+		}
+	}
+	maxMem = math.Ceil(maxMem/10) * 10
+
+	memSection := renderChartSection("Memory", "MB", m.memHistory[m.selectedID], maxMem, chartW, chartH)
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		"",
+		cpuSection,
+		"",
+		memSection,
+		footer,
+	)
+}
+
+// renderChartSection renders a labelled bar chart for a single metric (CPU or Memory).
+// Values are plotted left-to-right (oldest → newest), right-aligned when fewer than
+// chartW points are available. maxVal is the Y-axis ceiling (fixed for CPU, auto for MEM).
+func renderChartSection(label, unit string, values []float64, maxVal float64, chartW, chartH int) string {
+	var currentVal float64
+	if len(values) > 0 {
+		currentVal = values[len(values)-1]
+	}
+	sectionTitle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorBlue).
+		Render(fmt.Sprintf("  %s (%s)  current: %.1f%s  max: %.0f%s",
+			label, unit, currentVal, unit, maxVal, unit))
+
+	blockRunes := []rune{' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
+
+	// Pad values to chartW, right-aligned (newest on the right, empty space on the left).
+	padded := make([]float64, chartW)
+	if len(values) <= chartW {
+		copy(padded[chartW-len(values):], values)
+	} else {
+		copy(padded, values[len(values)-chartW:])
+	}
+
+	rows := make([]string, chartH)
+	for row := 0; row < chartH; row++ {
+		// row 0 = top (highest values), row chartH-1 = bottom (near zero).
+		rowHigh := maxVal * float64(chartH-row) / float64(chartH)
+		rowLow := maxVal * float64(chartH-1-row) / float64(chartH)
+
+		// Y-axis label: show value at top, mid, and bottom rows only.
+		var yLabel string
+		switch row {
+		case 0:
+			yLabel = fmt.Sprintf("  %7s ┤ ", fmt.Sprintf("%.0f%s", maxVal, unit))
+		case chartH / 2:
+			yLabel = fmt.Sprintf("  %7s ┤ ", fmt.Sprintf("%.0f%s", maxVal/2, unit))
+		case chartH - 1:
+			yLabel = fmt.Sprintf("  %7s ┤ ", "0")
+		default:
+			yLabel = fmt.Sprintf("  %7s ┤ ", "")
+		}
+
+		var sb strings.Builder
+		for _, v := range padded {
+			// Bar color depends on metric type and data value.
+			var barStyle lipgloss.Style
+			if label == "CPU" {
+				switch {
+				case v > 80:
+					barStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
+				case v > 50:
+					barStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
+				default:
+					barStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+				}
+			} else {
+				barStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+			}
+
+			if v >= rowHigh {
+				sb.WriteString(barStyle.Render("█"))
+			} else if v > rowLow {
+				fill := (v - rowLow) / (rowHigh - rowLow)
+				idx := int(math.Round(fill * 8))
+				if idx <= 0 {
+					idx = 1
+				}
+				if idx > 8 {
+					idx = 8
+				}
+				sb.WriteString(barStyle.Render(string(blockRunes[idx])))
+			} else {
+				sb.WriteRune(' ')
+			}
+		}
+		rows[row] = yLabel + sb.String()
+	}
+
+	xAxis := fmt.Sprintf("  %7s └%s now", "", strings.Repeat("─", chartW))
+
+	lines := []string{sectionTitle}
+	lines = append(lines, rows...)
+	lines = append(lines, xAxis)
+	return strings.Join(lines, "\n")
 }
 
 // truncate shortens s to max length, adding "…" if needed.

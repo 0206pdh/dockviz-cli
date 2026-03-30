@@ -33,6 +33,7 @@ const (
 	ViewDashboard View = iota
 	ViewDetail
 	ViewLogs
+	ViewChart
 )
 
 // tickMsg is sent on each refresh interval.
@@ -82,8 +83,10 @@ type Model struct {
 	// refreshing is true between pressing 'r' and the data arriving back
 	refreshing bool
 
-	// CPU sparkline history: containerID → last 10 CPU% readings
+	// CPU sparkline / chart history: containerID → last 60 CPU% readings
 	history map[string][]float64
+	// Memory chart history: containerID → last 60 MEM MB readings
+	memHistory map[string][]float64
 
 	// Log streaming state
 	logs      []string             // accumulated log lines for the current container
@@ -127,6 +130,7 @@ func newModel(dc docker.DockerClient, version string) Model {
 		spinner:         sp,
 		loading:         true,
 		history:         make(map[string][]float64),
+		memHistory:      make(map[string][]float64),
 		eventCh:         eventCh,
 		eventCancel:     eventCancel,
 		ContainerStates: make(map[string]docker.ContainerState),
