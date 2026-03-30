@@ -48,11 +48,17 @@ func (m Model) renderDashboard() string {
 
 	// When 'd' is pressed, replace the entire screen with the confirmation dialog.
 	if m.confirmDelete {
-		if m.activePanel == PanelImages && len(m.images) > 0 {
-			return m.renderConfirmDelete(m.images[m.cursor].Tags, "image")
-		}
 		if m.activePanel == PanelContainers && len(m.containers) > 0 {
-			return m.renderConfirmDelete(m.containers[m.cursor].Name, "container")
+			return m.renderConfirmDelete(m.containers[m.cursor].Name, "container",
+				"This will force-remove the container.\nRunning containers are stopped first.")
+		}
+		if m.activePanel == PanelImages && len(m.images) > 0 {
+			img := m.images[m.cursor]
+			subText := "This will remove the image and free disk space."
+			if len(img.AllTags) > 1 {
+				subText = fmt.Sprintf("Only this tag will be removed.\nImage remains (%d tags total).", len(img.AllTags))
+			}
+			return m.renderConfirmDelete(img.Tag, "image", subText)
 		}
 	}
 
@@ -65,8 +71,8 @@ func (m Model) renderDashboard() string {
 }
 
 // renderConfirmDelete replaces the full screen with a prominent red-bordered dialog.
-// kind is "container" or "image".
-func (m Model) renderConfirmDelete(name, kind string) string {
+// kind is "container" or "image". subText is shown as the secondary description line.
+func (m Model) renderConfirmDelete(name, kind, subText string) string {
 	dialogStyle := lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(ui.ColorRed).
@@ -74,10 +80,8 @@ func (m Model) renderConfirmDelete(name, kind string) string {
 		Width(50)
 
 	kindLabel := "Container"
-	subText := "This will force-remove the container.\nRunning containers are stopped first."
 	if kind == "image" {
-		kindLabel = "Image"
-		subText = "This will remove the local image.\nContainers using it must be removed first."
+		kindLabel = "Tag"
 	}
 
 	title := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorRed).Render("  ⚠  Confirm Delete")
@@ -342,7 +346,7 @@ func (m Model) renderImages() string {
 			cursor = "▶ "
 		}
 		row := fmt.Sprintf("%s%-40s %-14s %-10s",
-			cursor, truncate(img.Tags, 40), img.ID, docker.FormatSize(img.SizeMB))
+			cursor, truncate(img.Tag, 40), img.ID, docker.FormatSize(img.SizeMB))
 		if i == m.cursor {
 			row = ui.SelectedRowStyle.Render(row)
 		}
