@@ -563,7 +563,16 @@ func (m Model) renderChart() string {
 	}
 	const chartH = 8
 
-	cpuSection := renderChartSection("CPU", "%", m.history[m.selectedID], 100.0, chartW, chartH)
+	// Dynamic CPU scale: round up to nearest 100, minimum 100.
+	var maxCPU float64 = 100.0
+	for _, v := range m.history[m.selectedID] {
+		if v > maxCPU {
+			maxCPU = v
+		}
+	}
+	maxCPU = math.Ceil(maxCPU/100) * 100
+
+	cpuSection := renderChartSection("CPU", "%", m.history[m.selectedID], maxCPU, chartW, chartH)
 
 	var maxMem float64 = 10
 	for _, v := range m.memHistory[m.selectedID] {
