@@ -586,20 +586,47 @@ func (m Model) renderChart() string {
 }
 
 // renderChartSection renders a labelled bar chart for a single metric (CPU or Memory).
-// Values are plotted left-to-right (oldest → newest), right-aligned when fewer than
-// chartW points are available. maxVal is the Y-axis ceiling (fixed for CPU, auto for MEM).
+//
+// Layout per row:
+//   "  %7s ┤ " (12 chars) + chartW bar chars
+//
+// Y-axis: even rows + bottom row labelled with their upper boundary value.
+//   For CPU, the row containing 80% is relabelled in red and the row
+//   containing 50% is relabelled in yellow so danger thresholds are clear.
+//
+// Threshold lines: empty cells in the 80% and 50% CPU rows show a
+//   coloured dot so the boundary is visible even when bars are low.
+//
+// X-axis: a "└──… now" line followed by a time-elapsed label.
 func renderChartSection(label, unit string, values []float64, maxVal float64, chartW, chartH int) string {
+	// ── section title ──────────────────────────────────────────────
 	var currentVal float64
 	if len(values) > 0 {
 		currentVal = values[len(values)-1]
 	}
+
+	var currentStyle lipgloss.Style
+	if label == "CPU" {
+		switch {
+		case currentVal > 80:
+			currentStyle = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
+		case currentVal > 50:
+			currentStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
+		default:
+			currentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
+		}
+	} else {
+		currentStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true)
+	}
+	currentStr := currentStyle.Render(fmt.Sprintf("%.1f%s", currentVal, unit))
+	scaleStr := lipgloss.NewStyle().Foreground(ui.ColorGray).
+		Render(fmt.Sprintf("0 – %.0f%s", maxVal, unit))
 	sectionTitle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorBlue).
-		Render(fmt.Sprintf("  %s (%s)  current: %.1f%s  max: %.0f%s",
-			label, unit, currentVal, unit, maxVal, unit))
+		Render(fmt.Sprintf("  %s", label)) +
+		"   " + currentStr + "   " + scaleStr
 
+	// ── pad/trim values to chartW (newest on the right) ────────────
 	blockRunes := []rune{' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
-
-	// Pad values to chartW, right-aligned (newest on the right, empty space on the left).
 	padded := make([]float64, chartW)
 	if len(values) <= chartW {
 		copy(padded[chartW-len(values):], values)
@@ -607,28 +634,38 @@ func renderChartSection(label, unit string, values []float64, maxVal float64, ch
 		copy(padded, values[len(values)-chartW:])
 	}
 
+	// ── bar rows ───────────────────────────────────────────────────
 	rows := make([]string, chartH)
 	for row := 0; row < chartH; row++ {
-		// row 0 = top (highest values), row chartH-1 = bottom (near zero).
 		rowHigh := maxVal * float64(chartH-row) / float64(chartH)
 		rowLow := maxVal * float64(chartH-1-row) / float64(chartH)
 
-		// Y-axis label: show value at top, mid, and bottom rows only.
-		var yLabel string
-		switch row {
-		case 0:
-			yLabel = fmt.Sprintf("  %7s ┤ ", fmt.Sprintf("%.0f%s", maxVal, unit))
-		case chartH / 2:
-			yLabel = fmt.Sprintf("  %7s ┤ ", fmt.Sprintf("%.0f%s", maxVal/2, unit))
-		case chartH - 1:
-			yLabel = fmt.Sprintf("  %7s ┤ ", "0")
-		default:
-			yLabel = fmt.Sprintf("  %7s ┤ ", "")
-		}
+		// Threshold row detection (CPU only).
+		isCPU80Row := label == "CPU" && 80.0 <= rowHigh && 80.0 > rowLow
+		isCPU50Row := label == "CPU" && 50.0 <= rowHigh && 50.0 > rowLow
 
+		// Y-axis label: threshold rows override; even rows show boundary; bottom = 0.
+		var yLabelText string
+		yLabelStyle := lipgloss.NewStyle()
+		switch {
+		case row == chartH-1:
+			yLabelText = "0"
+		case isCPU80Row:
+			yLabelText = "80%"
+			yLabelStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
+		case isCPU50Row:
+			yLabelText = "50%"
+			yLabelStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
+		case row%2 == 0:
+			yLabelText = fmt.Sprintf("%.0f%s", rowHigh, unit)
+		}
+		// Right-align plain text first (so fmt counts plain chars),
+		// then colourize so ANSI codes don't shift column widths.
+		yLabel := "  " + yLabelStyle.Render(fmt.Sprintf("%7s", yLabelText)) + " ┤ "
+
+		// ── bar characters ────────────────────────────────────────
 		var sb strings.Builder
 		for _, v := range padded {
-			// Bar color depends on metric type and data value.
 			var barStyle lipgloss.Style
 			if label == "CPU" {
 				switch {
@@ -656,18 +693,52 @@ func renderChartSection(label, unit string, values []float64, maxVal float64, ch
 				}
 				sb.WriteString(barStyle.Render(string(blockRunes[idx])))
 			} else {
-				sb.WriteRune(' ')
+				// Empty cell — show threshold marker if applicable.
+				switch {
+				case isCPU80Row:
+					sb.WriteString(lipgloss.NewStyle().Foreground(ui.ColorRed).Render("·"))
+				case isCPU50Row:
+					sb.WriteString(lipgloss.NewStyle().Foreground(ui.ColorYellow).Render("·"))
+				default:
+					sb.WriteRune(' ')
+				}
 			}
 		}
 		rows[row] = yLabel + sb.String()
 	}
 
-	xAxis := fmt.Sprintf("  %7s └%s now", "", strings.Repeat("─", chartW))
+	// ── X-axis + time label ────────────────────────────────────────
+	xAxisLine := fmt.Sprintf("  %7s └%s now", "", strings.Repeat("─", chartW))
+
+	elapsed := len(values) * 2 // seconds of data currently stored
+	var timeRow string
+	if elapsed > 0 {
+		timeRow = fmt.Sprintf("  %7s   %s", "",
+			lipgloss.NewStyle().Foreground(ui.ColorGray).
+				Render(fmt.Sprintf("← %s ago", formatElapsedSecs(elapsed))))
+	} else {
+		timeRow = fmt.Sprintf("  %7s   %s", "",
+			lipgloss.NewStyle().Foreground(ui.ColorGray).Render("waiting for data..."))
+	}
 
 	lines := []string{sectionTitle}
 	lines = append(lines, rows...)
-	lines = append(lines, xAxis)
+	lines = append(lines, xAxisLine, timeRow)
 	return strings.Join(lines, "\n")
+}
+
+// formatElapsedSecs converts a duration in seconds to a short human-readable string.
+// Examples: 10 -> "10s", 90 -> "1m30s", 120 -> "2m".
+func formatElapsedSecs(seconds int) string {
+	if seconds < 60 {
+		return fmt.Sprintf("%ds", seconds)
+	}
+	mins := seconds / 60
+	secs := seconds % 60
+	if secs == 0 {
+		return fmt.Sprintf("%dm", mins)
+	}
+	return fmt.Sprintf("%dm%ds", mins, secs)
 }
 
 // truncate shortens s to max length, adding "…" if needed.
