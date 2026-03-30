@@ -256,3 +256,71 @@ docker run -d --name api-server \
 ```bash
 docker run -d --name api-server --network app-network -p 3000:3000 node:alpine sh -c "while true; do sleep 1; done"
 ```
+
+---
+
+## 11. 통계 히스토리 차트(`g` 키) 확인용 테스트 컨테이너
+
+**배경**
+
+`g` 키를 누르면 선택한 컨테이너의 CPU/MEM 히스토리를 전체 화면 차트로 볼 수 있다.
+임계선(80% 빨강, 50% 노랑), 막대 높낮이 변화, 색 전환이 제대로 동작하는지 확인하려면
+**변동성 있는** 부하를 만드는 컨테이너가 필요하다. 항상 100%이거나 항상 낮은 값이면 변화가 보이지 않는다.
+
+**흔히 쓰는 스트레스 컨테이너의 문제**
+
+```bash
+# 나쁜 예 — 계속 100% → 막대 높이 변화 없음
+docker run -d --name cpu-stress progrium/stress --cpu 2
+
+# 나쁜 예 — 너무 낮고 일정 → 임계선 도달 안 함
+docker run -d --name idle-app alpine sleep infinity
+```
+
+**변동성 있는 테스트 컨테이너**
+
+```bash
+# CPU 펄스 — 4초 부하 / 6초 휴식 반복, 50% 임계선을 오르내림
+docker run -d --name cpu-pulse alpine sh -c "
+while true; do
+  yes > /dev/null &
+  PID=\$!
+  sleep 4
+  kill \$PID
+  sleep 6
+done"
+
+# CPU 웨이브 — 강약을 번갈아 가며 부하 생성
+docker run -d --name cpu-wave alpine sh -c "
+while true; do
+  dd if=/dev/urandom of=/dev/null bs=1M count=200 2>/dev/null
+  sleep 8
+  dd if=/dev/urandom of=/dev/null bs=1M count=50 2>/dev/null
+  sleep 5
+  sleep 3
+done"
+
+# CPU 사인파형 — 단계적으로 올라갔다 내려오는 패턴, 막대가 자라고 줄어드는 것을 보기 좋음
+docker run -d --name cpu-sin alpine sh -c "
+i=0
+while true; do
+  i=\$((i+1))
+  mod=\$((i % 10))
+  if [ \$mod -lt 5 ]; then
+    yes > /dev/null &
+    PID=\$!
+    sleep \$((mod + 1))
+    kill \$PID 2>/dev/null
+  else
+    sleep 2
+  fi
+done"
+```
+
+두세 개를 동시에 실행한 뒤 차트 뷰에서 `↑`/`↓` 로 컨테이너를 바꿔가며 부하 패턴을 비교할 수 있다.
+
+**정리**
+
+```bash
+docker rm -f cpu-pulse cpu-wave cpu-sin
+```

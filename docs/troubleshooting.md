@@ -231,3 +231,69 @@ Press `Ctrl+C` to cancel, then run the command as a single line.
 ```bash
 docker run -d --name api-server --network app-network -p 3000:3000 node:alpine sh -c "while true; do sleep 1; done"
 ```
+
+---
+
+## 11. Test containers for verifying the stats history chart (`g` key)
+
+**Context**
+
+The `g` key opens a full-screen CPU/MEM history chart per container. To verify that threshold lines (80% red, 50% yellow), bar height variation, and colour transitions all work correctly, you need containers that produce **oscillating** load — not flat 100% or near-zero constant.
+
+**Problem with naive stress containers**
+
+```bash
+# Bad — pegs at 100% constantly, bars never change height
+docker run -d --name cpu-stress progrium/stress --cpu 2
+
+# Bad — too low and flat, threshold lines never triggered
+docker run -d --name idle-app alpine sleep infinity
+```
+
+**Test containers with variable load**
+
+```bash
+# Pulsing CPU — alternates heavy/light every ~4 s, crosses 50% threshold visibly
+docker run -d --name cpu-pulse alpine sh -c "
+while true; do
+  yes > /dev/null &
+  PID=\$!
+  sleep 4
+  kill \$PID
+  sleep 6
+done"
+
+# Wave CPU — longer on/off cycle with different intensities
+docker run -d --name cpu-wave alpine sh -c "
+while true; do
+  dd if=/dev/urandom of=/dev/null bs=1M count=200 2>/dev/null
+  sleep 8
+  dd if=/dev/urandom of=/dev/null bs=1M count=50 2>/dev/null
+  sleep 5
+  sleep 3
+done"
+
+# Sinusoidal-ish CPU — graduated steps up and down, good for watching bar grow/shrink
+docker run -d --name cpu-sin alpine sh -c "
+i=0
+while true; do
+  i=\$((i+1))
+  mod=\$((i % 10))
+  if [ \$mod -lt 5 ]; then
+    yes > /dev/null &
+    PID=\$!
+    sleep \$((mod + 1))
+    kill \$PID 2>/dev/null
+  else
+    sleep 2
+  fi
+done"
+```
+
+Run two or three simultaneously and switch between them with `↑`/`↓` in the chart view to compare load profiles.
+
+**Cleanup**
+
+```bash
+docker rm -f cpu-pulse cpu-wave cpu-sin
+```
