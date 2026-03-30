@@ -55,10 +55,6 @@ A single static binary. No runtime dependencies. Drop it on any server and run.
 
 ## Screenshots
 
-<img width="1297" height="61" alt="image" src="https://github.com/user-attachments/assets/653aa3ee-fdec-4a86-bb3d-e282601678b2" />
-<img width="681" height="242" alt="image" src="https://github.com/user-attachments/assets/d08a5c2b-3019-47ee-a721-3c6e1e3c816f" />
-<img width="673" height="282" alt="image" src="https://github.com/user-attachments/assets/bd08af97-00af-4ae2-8984-3b1f26540f5c" />
-<img width="630" height="397" alt="image" src="https://github.com/user-attachments/assets/fa896233-26af-4747-829a-83d0905e3e1b" />
 
 ---
 
