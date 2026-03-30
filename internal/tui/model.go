@@ -96,6 +96,10 @@ type Model struct {
 	eventCh            <-chan docker.EventInfo // channel receiving live events
 	eventCancel        context.CancelFunc    // call to stop the event streaming goroutine
 	eventDisconnected  bool                  // true when the daemon dropped the event stream
+
+	// ContainerStates tracks the last-known health of each container derived from
+	// the event stream. Keyed by container name. Used to colorise topology nodes.
+	ContainerStates map[string]docker.ContainerState
 }
 
 // Init implements tea.Model. Starts the spinner, first data fetch, and event streaming.
@@ -115,16 +119,17 @@ func newModel(dc docker.DockerClient, version string) Model {
 	eventCh := dc.StreamEvents(eventCtx)
 
 	return Model{
-		version:     version,
-		docker:      dc,
-		activePanel: PanelContainers,
-		activeView:  ViewDashboard,
-		keys:        DefaultKeyMap(),
-		spinner:     sp,
-		loading:     true,
-		history:     make(map[string][]float64),
-		eventCh:     eventCh,
-		eventCancel: eventCancel,
+		version:         version,
+		docker:          dc,
+		activePanel:     PanelContainers,
+		activeView:      ViewDashboard,
+		keys:            DefaultKeyMap(),
+		spinner:         sp,
+		loading:         true,
+		history:         make(map[string][]float64),
+		eventCh:         eventCh,
+		eventCancel:     eventCancel,
+		ContainerStates: make(map[string]docker.ContainerState),
 	}
 }
 

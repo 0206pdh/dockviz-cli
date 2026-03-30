@@ -212,14 +212,87 @@ func (m Model) renderContainers() string {
 	return strings.Join(rows, "\n")
 }
 
-// renderNetworks shows a two-part view: a network list at the top and a detail
-// panel for the selected network at the bottom, including container IPs and status.
-//
-// TODO(v0.2.0): replace with a split topology/timeline layout.
-// Guard: if m.width < 80, fall back to vertical stack; if m.width == 0 (before
-// first WindowSizeMsg), render list only to avoid layout corruption on narrow
-// SSH terminals.
+// renderNetworks shows a split layout: left = topology graph, right = event timeline.
+// When m.width < 80 (narrow terminal or before the first WindowSizeMsg) it falls
+// back to a simple network list to avoid layout corruption.
 func (m Model) renderNetworks() string {
+	if m.width < 80 {
+		return m.renderNetworksFallback()
+	}
+
+	halfW := m.width/2 - 4
+
+	// --- Left panel: topology graph ---
+	topoTitle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorBlue).Render("  Topology")
+	topoBody := ui.RenderNetworkGraph(m.networks, m.ContainerStates)
+	leftContent := topoTitle + "\n\n" + topoBody
+	leftPanel := ui.PanelStyle.Width(halfW).Render(leftContent)
+
+	// --- Right panel: event timeline for selected network ---
+	var timelineTitle string
+	var timelineBody string
+	if m.cursor < len(m.networks) {
+		n := m.networks[m.cursor]
+		timelineTitle = lipgloss.NewStyle().Bold(true).Foreground(ui.ColorBlue).
+			Render(fmt.Sprintf("  Events — %s", n.Name))
+
+		// Build a set of container names belonging to this network.
+		netContainers := make(map[string]bool, len(n.Containers))
+		for _, ep := range n.Containers {
+			netContainers[ep.Name] = true
+		}
+
+		// Filter events to this network's containers.
+		var filtered []string
+		maxRows := m.height - 10
+		if maxRows < 4 {
+			maxRows = 4
+		}
+		for _, e := range m.events {
+			if !netContainers[e.ContainerName] {
+				continue
+			}
+			timeStr := e.Time.Format("15:04:05")
+			icon, style := eventActionStyle(e.Action)
+			actionText := fmt.Sprintf("%-10s", icon+" "+e.Action)
+			actionStr := style.Render(actionText)
+
+			line := fmt.Sprintf("  %-10s %s %-18s", timeStr, actionStr, truncate(e.ContainerName, 18))
+
+			// Append ExitCode / OOM annotation for die events.
+			if e.Action == "die" {
+				ann := fmt.Sprintf(" exit=%d", e.ExitCode)
+				if e.OOMKilled {
+					ann += lipgloss.NewStyle().Foreground(ui.ColorRed).Render(" OOM")
+				}
+				line += ann
+			}
+			filtered = append(filtered, line)
+			if len(filtered) >= maxRows {
+				break
+			}
+		}
+
+		if len(filtered) == 0 {
+			timelineBody = "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).
+				Render("No events for this network yet.")
+		} else {
+			timelineBody = "\n" + strings.Join(filtered, "\n")
+		}
+	} else {
+		timelineTitle = lipgloss.NewStyle().Foreground(ui.ColorGray).Render("  Events")
+		timelineBody = "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).Render("Select a network.")
+	}
+
+	rightContent := timelineTitle + timelineBody
+	rightPanel := ui.PanelStyle.Width(halfW).Render(rightContent)
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, "  ", rightPanel)
+}
+
+// renderNetworksFallback is used when the terminal is narrower than 80 columns.
+// It renders a plain network list without the split topology/timeline panels.
+func (m Model) renderNetworksFallback() string {
 	header := ui.HeaderStyle.Render(
 		fmt.Sprintf("  %-22s %-10s %-20s %-5s", "NETWORK", "DRIVER", "SUBNET", "CTRS"),
 	)
@@ -251,66 +324,7 @@ func (m Model) renderNetworks() string {
 
 	if len(m.networks) == 0 {
 		rows = append(rows, "\n  No networks found.")
-		return strings.Join(rows, "\n")
 	}
-
-	// Detail panel for the selected network.
-	if m.cursor < len(m.networks) {
-		n := m.networks[m.cursor]
-		rows = append(rows, "")
-
-		// Divider line with network info embedded.
-		dividerTitle := fmt.Sprintf(" %s  %s", n.Name, n.Driver)
-		if n.Subnet != "" {
-			dividerTitle += "  " + n.Subnet
-		}
-		dividerTitle += " "
-		dividerLine := lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true).Render("  ──"+dividerTitle) +
-			lipgloss.NewStyle().Foreground(ui.ColorGray).Render(strings.Repeat("─", 36))
-		rows = append(rows, dividerLine)
-
-		if len(n.Containers) == 0 {
-			rows = append(rows, lipgloss.NewStyle().Foreground(ui.ColorGray).Render("    (no containers attached)"))
-		} else {
-			// Build a name→status map from the live container list.
-			statusMap := make(map[string]string, len(m.containers))
-			for _, c := range m.containers {
-				statusMap[c.Name] = c.Status
-			}
-			// Sub-header for the detail section.
-			subHeader := lipgloss.NewStyle().Foreground(ui.ColorGray).Render(
-				fmt.Sprintf("    %-22s %-18s %s", "CONTAINER", "IPv4", "STATUS"),
-			)
-			rows = append(rows, subHeader)
-
-			for j, ep := range n.Containers {
-				status := statusMap[ep.Name]
-				ipv4 := ep.IPv4
-				if ipv4 == "" {
-					ipv4 = "—"
-				}
-
-				// Connector symbol: └─ for last item, ├─ for others.
-				connector := "├─"
-				if j == len(n.Containers)-1 {
-					connector = "└─"
-				}
-				connStyle := lipgloss.NewStyle().Foreground(ui.ColorGray).Render("    " + connector + " ")
-
-				// Status icon + name
-				icon := ui.StatusIcon(status)
-				iconStr := ui.StatusStyle(status).Render(icon)
-
-				nameStr := fmt.Sprintf("%-20s", truncate(ep.Name, 20))
-				ipStr := fmt.Sprintf("%-18s", ipv4)
-				statusStr := ui.StatusStyle(status).Render(status)
-
-				line := connStyle + iconStr + " " + nameStr + " " + ipStr + " " + statusStr
-				rows = append(rows, line)
-			}
-		}
-	}
-
 	return strings.Join(rows, "\n")
 }
 

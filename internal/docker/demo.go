@@ -219,7 +219,7 @@ func (d *DemoClient) StreamEvents(ctx context.Context) <-chan EventInfo {
 			{Time: now.Add(-4 * time.Minute), Action: "start", ContainerName: "worker", ContainerID: "e5f6a1b2c3d4"},
 			{Time: now.Add(-2 * time.Minute), Action: "create", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5"},
 			{Time: now.Add(-2 * time.Minute), Action: "start", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5"},
-			{Time: now.Add(-1 * time.Minute), Action: "die", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5"},
+			{Time: now.Add(-1 * time.Minute), Action: "die", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5", ExitCode: 0},
 			{Time: now.Add(-55 * time.Second), Action: "destroy", ContainerName: "db-migration", ContainerID: "f6a1b2c3d4e5"},
 		}
 		for _, e := range initial {
@@ -240,13 +240,20 @@ func (d *DemoClient) StreamEvents(ctx context.Context) <-chan EventInfo {
 			case <-time.After(5 * time.Second):
 				i := rand.Intn(len(names))
 				j := rand.Intn(len(liveActions))
-				select {
-				case ch <- EventInfo{
+				ev := EventInfo{
 					Time:          time.Now(),
 					Action:        liveActions[j],
 					ContainerName: names[i],
 					ContainerID:   ids[i],
-				}:
+				}
+				// Populate realistic exit code on die events for demo realism.
+				if liveActions[j] == "die" {
+					exitCodes := []int{0, 1, 137}
+					ev.ExitCode = exitCodes[rand.Intn(len(exitCodes))]
+					ev.OOMKilled = ev.ExitCode == 137 && rand.Intn(3) == 0
+				}
+				select {
+				case ch <- ev:
 				case <-ctx.Done():
 					return
 				}

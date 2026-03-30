@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/0206pdh/dockviz-cli/internal/docker"
 )
 
 // RenderNetworkGraph builds a compact ASCII representation of Docker networks.
-// Used as a fallback; the TUI renders a richer view directly.
+// Container nodes are coloured based on their ContainerState:
 //
-// Example output:
+//	● green  = running
+//	◑ yellow = restarting
+//	✗ red    = dead
+//	○ gray   = unknown / no event data yet
 //
-//	bridge : nginx ─── postgres ─── redis
-//	host   : (no containers)
-func RenderNetworkGraph(networks []docker.NetworkInfo) string {
+// Pass a nil or empty states map to render without colour decoration.
+func RenderNetworkGraph(networks []docker.NetworkInfo, states map[string]docker.ContainerState) string {
 	if len(networks) == 0 {
 		return "  No networks found."
 	}
@@ -27,11 +30,30 @@ func RenderNetworkGraph(networks []docker.NetworkInfo) string {
 			sb.WriteString(label + ": (no containers)\n")
 			continue
 		}
-		names := make([]string, len(n.Containers))
+		nodes := make([]string, len(n.Containers))
 		for i, ep := range n.Containers {
-			names[i] = ep.Name
+			nodes[i] = containerLabel(ep.Name, states)
 		}
-		sb.WriteString(label + ": " + strings.Join(names, " \u2500\u2500\u2500 ") + "\n")
+		sb.WriteString(label + ": " + strings.Join(nodes, " \u2500\u2500\u2500 ") + "\n")
 	}
 	return sb.String()
+}
+
+// containerLabel returns a coloured "icon name" string for a container node.
+// The colour and icon reflect the container's last-known state from the event stream.
+func containerLabel(name string, states map[string]docker.ContainerState) string {
+	cs, ok := states[name]
+	if !ok {
+		return lipgloss.NewStyle().Foreground(ColorGray).Render("○ " + name)
+	}
+	switch cs.Status {
+	case "dead":
+		return lipgloss.NewStyle().Foreground(ColorRed).Render("✗ " + name)
+	case "restarting":
+		return lipgloss.NewStyle().Foreground(ColorYellow).Render("◑ " + name)
+	case "running":
+		return lipgloss.NewStyle().Foreground(ColorGreen).Render("● " + name)
+	default:
+		return lipgloss.NewStyle().Foreground(ColorGray).Render("○ " + name)
+	}
 }
