@@ -38,29 +38,39 @@ Run `dockviz --demo` to try it right now without Docker.
 <img width="630" height="397" alt="image" src="https://github.com/user-attachments/assets/fa896233-26af-4747-829a-83d0905e3e1b" />
 
 
-### Linux / VM — one-liner (no Go required)
+### Linux / macOS — one-liner (auto-detects OS and architecture)
 
 ```bash
-# amd64 (most servers/VMs)
+curl -sL "https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+  -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
+```
+
+Works on Linux (amd64/arm64) and macOS (Intel/Apple Silicon) without any modification.
+
+To update to the latest version, run the same command again.
+
+<details>
+<summary>Manual download (pick your platform)</summary>
+
+```bash
+# Linux amd64 (most servers/VMs)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-amd64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 
-# arm64 (Raspberry Pi, AWS Graviton, etc.)
+# Linux arm64 (Raspberry Pi, AWS Graviton, etc.)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-arm64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
-```
 
-### macOS — one-liner
-
-```bash
-# Intel Mac (amd64)
+# macOS Intel
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-amd64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 
-# Apple Silicon (M1/M2/M3)
+# macOS Apple Silicon (M1/M2/M3)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-arm64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 ```
+
+</details>
 
 ### Windows
 

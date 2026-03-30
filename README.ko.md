@@ -73,29 +73,39 @@ docker images
 
 ## 설치
 
-### Linux / VM — 한 줄 설치 (Go 불필요)
+### Linux / macOS — 한 줄 설치 (OS 및 아키텍처 자동 감지)
 
 ```bash
-# amd64 (일반 서버/VM)
+curl -sL "https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+  -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
+```
+
+Linux (amd64/arm64), macOS (Intel/Apple Silicon) 모두 동일한 명령어로 설치됩니다.
+
+업데이트도 같은 명령어를 다시 실행하면 됩니다.
+
+<details>
+<summary>플랫폼별 직접 지정</summary>
+
+```bash
+# Linux amd64 (일반 서버/VM)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-amd64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 
-# arm64 (라즈베리 파이, AWS Graviton 등)
+# Linux arm64 (라즈베리 파이, AWS Graviton 등)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-linux-arm64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
-```
 
-### macOS
-
-```bash
-# Intel Mac (amd64)
+# macOS Intel
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-amd64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 
-# Apple Silicon (M1/M2/M3)
+# macOS Apple Silicon (M1/M2/M3)
 curl -sL https://github.com/0206pdh/dockviz-cli/releases/latest/download/dockviz-darwin-arm64 \
   -o /usr/local/bin/dockviz && chmod +x /usr/local/bin/dockviz
 ```
+
+</details>
 
 ### Windows
 
