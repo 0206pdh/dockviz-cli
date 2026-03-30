@@ -61,6 +61,10 @@ func (c *Client) ListNetworks() ([]NetworkInfo, error) {
 				IPv4: ipv4,
 			})
 		}
+		// NetworkInspect returns containers from a map — sort by name for stable order.
+		sort.Slice(endpoints, func(i, j int) bool {
+			return endpoints[i].Name < endpoints[j].Name
+		})
 
 		result = append(result, NetworkInfo{
 			ID:         n.ID[:12],
