@@ -524,7 +524,7 @@ func (m Model) renderFooter() string {
 	case PanelContainers:
 		line2 = "[Enter] Detail  [s] Start/Stop  [d] Delete  [l] Logs"
 	case PanelNetworks:
-		line2 = "[↑↓] Select network  ·  detail panel updates below"
+		line2 = "● running  ◑ restarting  ✗ dead  ○ unknown  ·  [↑↓] select network"
 	case PanelImages:
 		line2 = "[d] Delete image"
 	case PanelEvents:
