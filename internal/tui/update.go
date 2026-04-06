@@ -170,6 +170,30 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// --- Detail view key handling ---
+	if m.activeView == ViewDetail {
+		switch {
+		case keyMatches(msg, km.Quit):
+			if m.logCancel != nil {
+				m.logCancel()
+			}
+			if m.eventCancel != nil {
+				m.eventCancel()
+			}
+			return m, tea.Quit
+		case keyMatches(msg, km.Back):
+			m.activeView = ViewDashboard
+		case keyMatches(msg, km.Exec):
+			// Find the selected container by ID and exec if running.
+			for _, c := range m.containers {
+				if c.ID == m.selectedID && c.Status == "running" && !m.demo {
+					return m, execShellCmd(c.Name, m.host)
+				}
+			}
+		}
+		return m, nil
+	}
+
 	// --- Chart view key handling ---
 	if m.activeView == ViewChart {
 		switch {
