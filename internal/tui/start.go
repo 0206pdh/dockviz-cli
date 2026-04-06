@@ -29,8 +29,7 @@ func Start(demo bool, host string, version string) error {
 
 	// Init() on the model handles the first fetch and tick automatically.
 	p := tea.NewProgram(m,
-		tea.WithAltScreen(),       // use alternate screen buffer (no scroll pollution)
-		tea.WithMouseCellMotion(), // optional: enable mouse support
+		tea.WithAltScreen(), // use alternate screen buffer (no scroll pollution)
 	)
 
 	if _, err := p.Run(); err != nil {
