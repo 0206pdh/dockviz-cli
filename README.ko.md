@@ -411,20 +411,23 @@ go build -ldflags="-X main.version=v1.2.3" -o dockviz .
 
 ## CI/CD — GitHub Actions 자동 릴리즈
 
-버전 태그를 푸시하면 GitHub Actions가 자동으로 빌드하고 릴리즈합니다.
+`main`에 push(예: PR 머지)될 때마다 자동으로 릴리스됩니다. `determine_version` job이 최신 `vX.Y.Z` 태그를 찾아 patch 버전을 올리고, 그 커밋에 태그를 붙여 해당 버전을 배포합니다 — 수동 태깅이 필요 없습니다. 버전 태그를 직접 push하는 것도 여전히 가능하며, 이 경우 자동 증가 없이 그 태그 버전 그대로 릴리스됩니다.
 
 ```bash
 git tag v1.2.3 && git push origin v1.2.3
 ```
 
 Actions 동작:
-1. Linux / macOS / Windows 6개 타겟을 크로스 컴파일
-2. `-ldflags="-X main.version=${{ github.ref_name }}"` 으로 태그 버전 주입
-3. 릴리스 바이너리로 플랫폼별 Python wheel 빌드
-4. Linux amd64 / arm64 용 Debian 패키지 빌드
-5. 저장소 변수 `PYPI_PUBLISHING_ENABLED` 가 `true` 이면 Trusted Publishing으로 `dockviz` wheel 을 PyPI에 배포
-6. `APT_GPG_PRIVATE_KEY` 가 설정되어 있으면 GitHub Pages에 서명된 APT 저장소 배포
-7. 바이너리, wheel, `.deb` 패키지를 GitHub Releases 자산으로 업로드
+1. 릴리스 버전 결정 — push된 태그 그대로, 또는 `main`의 최신 태그 + patch 1 증가
+2. Linux / macOS / Windows 6개 타겟을 크로스 컴파일
+3. `-ldflags="-X main.version=..."` 으로 결정된 버전 주입
+4. 릴리스 바이너리로 플랫폼별 Python wheel 빌드
+5. Linux amd64 / arm64 용 Debian 패키지 빌드
+6. 저장소 변수 `PYPI_PUBLISHING_ENABLED` 가 `true` 이면 Trusted Publishing으로 `dockviz` wheel 을 PyPI에 배포
+7. `APT_GPG_PRIVATE_KEY` 가 설정되어 있으면 GitHub Pages에 서명된 APT 저장소 배포
+8. 바이너리, wheel, `.deb` 패키지를 GitHub Releases 자산으로 업로드
+
+> **참고:** `main`에 머지되는 모든 변경사항이 릴리스로 이어지므로, 버전을 올리고 싶지 않은 문서 전용/CI 전용 변경은 `main`에 직접 머지하지 않는 게 좋습니다.
 
 ### 배포 준비
 

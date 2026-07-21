@@ -1,5 +1,9 @@
-# release.yml — build cross-platform binaries and publish a GitHub Release
-# on every push of a version tag (e.g. v1.2.3).
+# release.yml — build cross-platform binaries and publish a GitHub Release.
+#
+# Triggers on:
+#   - push of a version tag (e.g. v1.2.3)               → release exactly that version
+#   - push to main (e.g. a merged PR)                    → auto-bump the patch version,
+#                                                            tag it, and release that
 #
 # Artifacts produced:
 #   dockviz-linux-amd64
@@ -11,12 +15,55 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"   # trigger on any tag that looks like a version
 
 jobs:
+  determine_version:
+    name: Determine Release Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to push the auto-bumped tag on a main-branch push
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history + tags, needed to find the latest version
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Triggered by a push to main: auto-bump the patch version from the
+          # latest existing tag (v0.4.6 -> v0.4.7). Falls back to v0.0.1 if no
+          # tag exists yet.
+          latest=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          if [ -z "$latest" ]; then
+            latest="v0.0.0"
+          fi
+          IFS='.' read -r major minor patch <<< "${latest#v}"
+          next="v${major}.${minor}.$((patch + 1))"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$next" -m "$next — auto release from $(git rev-parse --short HEAD)"
+          # Pushed with GITHUB_TOKEN: intentionally does NOT re-trigger this
+          # workflow (GitHub Actions doesn't cascade off its own token), so
+          # this run continues on to build/release $next without a duplicate run.
+          git push origin "$next"
+
   build:
     name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    needs: determine_version
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -54,7 +101,7 @@ jobs:
           GOOS=${{ matrix.goos }} \
           GOARCH=${{ matrix.goarch }} \
           go build \
-            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -ldflags="-s -w -X main.version=${{ needs.determine_version.outputs.version }}" \
             -o dockviz-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} \
             .
 
@@ -67,7 +114,7 @@ jobs:
 
   package_python:
     name: Package Python Wheel (${{ matrix.artifact }})
-    needs: build
+    needs: [build, determine_version]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -112,7 +159,7 @@ jobs:
       - name: Build wheel
         env:
           DOCKVIZ_BINARY: dist/${{ matrix.artifact }}/${{ matrix.binary }}
-          DOCKVIZ_VERSION: ${{ github.ref_name }}
+          DOCKVIZ_VERSION: ${{ needs.determine_version.outputs.version }}
           DOCKVIZ_WHEEL_PLAT_NAME: ${{ matrix.plat_name }}
         run: python -m build --wheel --outdir dist/python
 
@@ -125,7 +172,7 @@ jobs:
 
   package_deb:
     name: Package Debian (${{ matrix.arch }})
-    needs: build
+    needs: [build, determine_version]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -152,7 +199,7 @@ jobs:
           chmod +x packaging/build-deb.sh
           packaging/build-deb.sh \
             dist/${{ matrix.artifact }}/${{ matrix.binary }} \
-            ${{ github.ref_name }} \
+            ${{ needs.determine_version.outputs.version }} \
             ${{ matrix.arch }} \
             dist/deb/dockviz-linux-${{ matrix.arch }}.deb
 
@@ -250,6 +297,7 @@ jobs:
   release:
     name: Create GitHub Release
     needs:
+      - determine_version
       - build
       - package_python
       - package_deb
@@ -266,6 +314,9 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # Explicit tag: on a main-branch push the triggering ref is
+          # refs/heads/main, not the tag determine_version just pushed.
+          tag_name: ${{ needs.determine_version.outputs.version }}
           # Attach every binary found under dist/.
           files: dist/**/*
           # Do not auto-generate notes — release notes are written manually

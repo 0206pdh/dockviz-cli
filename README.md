@@ -411,20 +411,27 @@ go build -ldflags="-X main.version=v1.2.3" -o dockviz .
 
 ## CI/CD
 
-Pushing a version tag triggers GitHub Actions to cross-compile and publish binaries for all six targets automatically:
+Every push to `main` (e.g. a merged PR) automatically releases: the `determine_version`
+job finds the latest `vX.Y.Z` tag, bumps the patch number, tags the commit, and
+publishes that version — no manual tagging required. Pushing a version tag directly
+still works too, and releases exactly that version instead of auto-bumping:
 
 ```bash
 git tag v1.2.3 && git push origin v1.2.3
 ```
 
 Actions:
-1. Cross-compiles for Linux amd64/arm64, macOS amd64/arm64, Windows amd64/arm64
-2. Injects the tag as the version string via `-ldflags="-X main.version=${{ github.ref_name }}"`
-3. Builds platform-specific Python wheels from the release binaries
-4. Builds Debian packages for Linux amd64 and arm64
-5. Publishes `dockviz` wheels to PyPI via Trusted Publishing when the `PYPI_PUBLISHING_ENABLED` repository variable is `true`
-6. Publishes a signed APT repository to GitHub Pages when `APT_GPG_PRIVATE_KEY` is configured
-7. Uploads binaries, wheels, and `.deb` packages to GitHub Releases
+1. Resolves the release version — the pushed tag, or `main`'s latest tag + 1 patch
+2. Cross-compiles for Linux amd64/arm64, macOS amd64/arm64, Windows amd64/arm64
+3. Injects the resolved version as the version string via `-ldflags="-X main.version=..."`
+4. Builds platform-specific Python wheels from the release binaries
+5. Builds Debian packages for Linux amd64 and arm64
+6. Publishes `dockviz` wheels to PyPI via Trusted Publishing when the `PYPI_PUBLISHING_ENABLED` repository variable is `true`
+7. Publishes a signed APT repository to GitHub Pages when `APT_GPG_PRIVATE_KEY` is configured
+8. Uploads binaries, wheels, and `.deb` packages to GitHub Releases
+
+> **Note:** since every merge to `main` ships a release, avoid merging docs-only or
+> CI-only changes directly to `main` if you don't want a version bump for them.
 
 ### Distribution setup
 
