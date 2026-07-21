@@ -1,7 +1,19 @@
 # Build output
 dockviz
 dockviz.exe
+dockviz-*
+build/
 dist/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Release/package output
+*.whl
+*.deb
+repo-site/
 
 # Editor
 .vscode/

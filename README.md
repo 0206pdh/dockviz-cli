@@ -60,6 +60,27 @@ A single static binary. No runtime dependencies. Drop it on any server and run.
 
 ## Installation
 
+### pip
+
+```bash
+python3 -m pip install dockviz
+```
+
+`dockviz` is available as a platform wheel package. The release workflow publishes it to PyPI when `PYPI_API_TOKEN` is configured in GitHub repository secrets.
+
+### apt (Debian / Ubuntu repository)
+
+```bash
+curl -fsSL https://0206pdh.github.io/dockviz-cli/apt/dockviz-archive-keyring.asc \
+  | sudo gpg --dearmor -o /usr/share/keyrings/dockviz-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/dockviz-archive-keyring.gpg] https://0206pdh.github.io/dockviz-cli/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/dockviz.list > /dev/null
+sudo apt update
+sudo apt install dockviz
+```
+
+The same release workflow publishes a signed APT repository to GitHub Pages when the signing key secrets are configured.
+
 ### Linux / macOS — one-liner (auto-detects OS and architecture)
 
 ```bash
@@ -399,7 +420,23 @@ git tag v1.2.3 && git push origin v1.2.3
 Actions:
 1. Cross-compiles for Linux amd64/arm64, macOS amd64/arm64, Windows amd64/arm64
 2. Injects the tag as the version string via `-ldflags="-X main.version=${{ github.ref_name }}"`
-3. Uploads all binaries to GitHub Releases
+3. Builds platform-specific Python wheels from the release binaries
+4. Builds Debian packages for Linux amd64 and arm64
+5. Publishes `dockviz` wheels to PyPI when `PYPI_API_TOKEN` is configured
+6. Publishes a signed APT repository to GitHub Pages when `APT_GPG_PRIVATE_KEY` is configured
+7. Uploads binaries, wheels, and `.deb` packages to GitHub Releases
+
+### Distribution setup
+
+One-time repository configuration before the first release:
+
+1. PyPI
+   Create the `dockviz` project on PyPI and add `PYPI_API_TOKEN` as a GitHub repository secret.
+2. GitHub Pages
+   Enable GitHub Pages for this repository with GitHub Actions as the source.
+3. APT signing key
+   Add the ASCII-armored private key as `APT_GPG_PRIVATE_KEY`.
+   Add the passphrase as `APT_GPG_PASSPHRASE` if the key is encrypted.
 
 The `curl` one-liner on the install section always resolves to the latest release via GitHub's `/releases/latest/download/` redirect.
 
