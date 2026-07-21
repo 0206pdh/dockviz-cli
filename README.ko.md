@@ -65,7 +65,7 @@ docker images
 python3 -m pip install dockviz
 ```
 
-`dockviz` 패키지는 플랫폼별 wheel 형태로 배포됩니다. GitHub 저장소 시크릿에 `PYPI_API_TOKEN` 을 추가하면 릴리스 워크플로가 `v*` 태그마다 PyPI에 자동 업로드합니다.
+`dockviz` 패키지는 플랫폼별 wheel 형태로 배포됩니다. 저장소 변수 `PYPI_PUBLISHING_ENABLED` 를 `true` 로 설정하면 릴리스 워크플로가 [Trusted Publishing](https://docs.pypi.org/trusted-publishers/)(API 토큰 저장 불필요)으로 `v*` 태그마다 PyPI에 자동 업로드합니다.
 
 ### apt (Debian / Ubuntu 저장소)
 
@@ -422,7 +422,7 @@ Actions 동작:
 2. `-ldflags="-X main.version=${{ github.ref_name }}"` 으로 태그 버전 주입
 3. 릴리스 바이너리로 플랫폼별 Python wheel 빌드
 4. Linux amd64 / arm64 용 Debian 패키지 빌드
-5. `PYPI_API_TOKEN` 이 설정되어 있으면 `dockviz` wheel 을 PyPI에 배포
+5. 저장소 변수 `PYPI_PUBLISHING_ENABLED` 가 `true` 이면 Trusted Publishing으로 `dockviz` wheel 을 PyPI에 배포
 6. `APT_GPG_PRIVATE_KEY` 가 설정되어 있으면 GitHub Pages에 서명된 APT 저장소 배포
 7. 바이너리, wheel, `.deb` 패키지를 GitHub Releases 자산으로 업로드
 
@@ -431,7 +431,7 @@ Actions 동작:
 첫 릴리스 전에 한 번만 설정하면 됩니다.
 
 1. PyPI
-   PyPI에 `dockviz` 프로젝트를 만들고 GitHub 저장소 시크릿에 `PYPI_API_TOKEN` 을 추가합니다.
+   [PyPI Trusted Publisher](https://pypi.org/manage/account/publishing/)를 pending 상태로 등록합니다: 프로젝트명 `dockviz`, owner `0206pdh`, 저장소 `dockviz-cli`, 워크플로 `release.yml`, environment `pypi`. 이후 저장소 변수 `PYPI_PUBLISHING_ENABLED` 를 `true` 로 설정합니다.
 2. GitHub Pages
    이 저장소의 GitHub Pages 소스를 GitHub Actions로 설정합니다.
 3. APT 서명 키

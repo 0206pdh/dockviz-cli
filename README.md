@@ -66,7 +66,7 @@ A single static binary. No runtime dependencies. Drop it on any server and run.
 python3 -m pip install dockviz
 ```
 
-`dockviz` is available as a platform wheel package. The release workflow publishes it to PyPI when `PYPI_API_TOKEN` is configured in GitHub repository secrets.
+`dockviz` is available as a platform wheel package. The release workflow publishes it to PyPI via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) (no stored API token) when the `PYPI_PUBLISHING_ENABLED` repository variable is set to `true`.
 
 ### apt (Debian / Ubuntu repository)
 
@@ -422,7 +422,7 @@ Actions:
 2. Injects the tag as the version string via `-ldflags="-X main.version=${{ github.ref_name }}"`
 3. Builds platform-specific Python wheels from the release binaries
 4. Builds Debian packages for Linux amd64 and arm64
-5. Publishes `dockviz` wheels to PyPI when `PYPI_API_TOKEN` is configured
+5. Publishes `dockviz` wheels to PyPI via Trusted Publishing when the `PYPI_PUBLISHING_ENABLED` repository variable is `true`
 6. Publishes a signed APT repository to GitHub Pages when `APT_GPG_PRIVATE_KEY` is configured
 7. Uploads binaries, wheels, and `.deb` packages to GitHub Releases
 
@@ -431,7 +431,7 @@ Actions:
 One-time repository configuration before the first release:
 
 1. PyPI
-   Create the `dockviz` project on PyPI and add `PYPI_API_TOKEN` as a GitHub repository secret.
+   Register a [pending Trusted Publisher](https://pypi.org/manage/account/publishing/) on PyPI: project name `dockviz`, owner `0206pdh`, repository `dockviz-cli`, workflow `release.yml`, environment `pypi`. Then set the `PYPI_PUBLISHING_ENABLED` repository variable to `true`.
 2. GitHub Pages
    Enable GitHub Pages for this repository with GitHub Actions as the source.
 3. APT signing key

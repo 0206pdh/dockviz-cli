@@ -163,13 +163,28 @@ jobs:
           path: dist/deb/*.deb
           if-no-files-found: error
 
+  check_secrets:
+    name: Check Optional Publish Secrets
+    runs-on: ubuntu-latest
+    outputs:
+      apt: ${{ steps.check.outputs.apt }}
+    steps:
+      - name: Check which secrets are configured
+        id: check
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          [ -n "$APT_GPG_PRIVATE_KEY" ] && echo "apt=true" >> "$GITHUB_OUTPUT" || echo "apt=false" >> "$GITHUB_OUTPUT"
+
   publish_pypi:
     name: Publish To PyPI
-    if: ${{ secrets.PYPI_API_TOKEN != '' }}
+    if: ${{ vars.PYPI_PUBLISHING_ENABLED == 'true' }}
     needs: package_python
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
     permissions:
-      contents: read
+      id-token: write   # required for PyPI Trusted Publishing (OIDC)
 
     steps:
       - name: Download wheel artifacts
@@ -182,14 +197,13 @@ jobs:
       - name: Publish wheels
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
           packages-dir: dist/python/
           skip-existing: true
 
   deploy_apt_repo:
     name: Deploy APT Repository
-    if: ${{ secrets.APT_GPG_PRIVATE_KEY != '' }}
-    needs: package_deb
+    if: ${{ needs.check_secrets.outputs.apt == 'true' }}
+    needs: [package_deb, check_secrets]
     runs-on: ubuntu-latest
     permissions:
       pages: write
