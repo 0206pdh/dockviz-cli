@@ -167,25 +167,24 @@ jobs:
     name: Check Optional Publish Secrets
     runs-on: ubuntu-latest
     outputs:
-      pypi: ${{ steps.check.outputs.pypi }}
       apt: ${{ steps.check.outputs.apt }}
     steps:
       - name: Check which secrets are configured
         id: check
         env:
-          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
         run: |
-          [ -n "$PYPI_API_TOKEN" ] && echo "pypi=true" >> "$GITHUB_OUTPUT" || echo "pypi=false" >> "$GITHUB_OUTPUT"
           [ -n "$APT_GPG_PRIVATE_KEY" ] && echo "apt=true" >> "$GITHUB_OUTPUT" || echo "apt=false" >> "$GITHUB_OUTPUT"
 
   publish_pypi:
     name: Publish To PyPI
-    if: ${{ needs.check_secrets.outputs.pypi == 'true' }}
-    needs: [package_python, check_secrets]
+    if: ${{ vars.PYPI_PUBLISHING_ENABLED == 'true' }}
+    needs: package_python
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
     permissions:
-      contents: read
+      id-token: write   # required for PyPI Trusted Publishing (OIDC)
 
     steps:
       - name: Download wheel artifacts
@@ -198,7 +197,6 @@ jobs:
       - name: Publish wheels
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
           packages-dir: dist/python/
           skip-existing: true
 
