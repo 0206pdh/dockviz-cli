@@ -12,6 +12,13 @@ import (
 // DemoClient mimics Client but returns static/animated fake data.
 type DemoClient struct {
 	tick int
+
+	// pruned* flags let PruneX calls visibly shrink the DiskUsage() breakdown
+	// on the next fetch, so the demo prune flow looks real.
+	imagesPruned     bool
+	containersPruned bool
+	volumesPruned    bool
+	buildCachePruned bool
 }
 
 // NewDemoClient returns a demo client that needs no Docker daemon.
@@ -171,6 +178,66 @@ func (d *DemoClient) RemoveContainer(id string) error {
 func (d *DemoClient) RemoveImage(id string) error {
 	time.Sleep(200 * time.Millisecond)
 	return nil
+}
+
+// DiskUsage returns a static fake breakdown, shrunk per-category after the
+// matching PruneX method has been called so the demo prune flow looks real.
+func (d *DemoClient) DiskUsage() (DiskUsageInfo, error) {
+	info := DiskUsageInfo{
+		Images:     DiskUsageCategory{Label: "Images", Total: 9, Active: 5, SizeMB: 1240, ReclaimMB: 410},
+		Containers: DiskUsageCategory{Label: "Containers", Total: 6, Active: 5, SizeMB: 62, ReclaimMB: 18},
+		Volumes:    DiskUsageCategory{Label: "Local Volumes", Total: 4, Active: 2, SizeMB: 512, ReclaimMB: 96},
+		BuildCache: DiskUsageCategory{Label: "Build Cache", Total: 37, Active: 2, SizeMB: 2870, ReclaimMB: 2560},
+	}
+	if d.imagesPruned {
+		info.Images.Total -= 3
+		info.Images.SizeMB -= 410
+		info.Images.ReclaimMB = 0
+	}
+	if d.containersPruned {
+		info.Containers.Total -= 1
+		info.Containers.SizeMB -= 18
+		info.Containers.ReclaimMB = 0
+	}
+	if d.volumesPruned {
+		info.Volumes.Total -= 1
+		info.Volumes.SizeMB -= 96
+		info.Volumes.ReclaimMB = 0
+	}
+	if d.buildCachePruned {
+		info.BuildCache.Total -= 30
+		info.BuildCache.SizeMB -= 2560
+		info.BuildCache.ReclaimMB = 0
+	}
+	return info, nil
+}
+
+// PruneImages simulates removing dangling images.
+func (d *DemoClient) PruneImages() (float64, error) {
+	time.Sleep(400 * time.Millisecond)
+	d.imagesPruned = true
+	return 410, nil
+}
+
+// PruneContainers simulates removing stopped containers.
+func (d *DemoClient) PruneContainers() (float64, error) {
+	time.Sleep(400 * time.Millisecond)
+	d.containersPruned = true
+	return 18, nil
+}
+
+// PruneVolumes simulates removing unattached volumes.
+func (d *DemoClient) PruneVolumes() (float64, error) {
+	time.Sleep(400 * time.Millisecond)
+	d.volumesPruned = true
+	return 96, nil
+}
+
+// PruneBuildCache simulates removing unused build cache.
+func (d *DemoClient) PruneBuildCache() (float64, error) {
+	time.Sleep(400 * time.Millisecond)
+	d.buildCachePruned = true
+	return 2560, nil
 }
 
 // StreamLogs simulates a live log stream with pre-canned demo lines.

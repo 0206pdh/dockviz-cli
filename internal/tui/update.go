@@ -5,6 +5,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -138,6 +139,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.activeView = ViewDashboard
 		return m, fetchDataCmd(m.docker)
 
+	// Disk usage breakdown arrived
+	case diskUsageMsg:
+		m.diskUsageLoaded = true
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.err = nil
+		m.diskUsage = msg.info
+		return m, nil
+
+	// A prune action (images/containers/volumes/build cache) finished
+	case pruneDoneMsg:
+		m.pruning = false
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.pruneResultMsg = fmt.Sprintf("%s: freed %s", categoryLabel(msg.category), docker.FormatSize(msg.freedMB))
+		return m, fetchDiskUsageCmd(m.docker)
+
 	// Keyboard input
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -157,11 +179,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmDelete = false
 			id := m.pendingDeleteID
 			m.pendingDeleteID = ""
-			if m.activePanel == PanelImages {
+			switch m.activePanel {
+			case PanelImages:
 				return m, removeImageCmd(m.docker, id)
+			case PanelDiskUsage:
+				m.pruning = true
+				m.pruneResultMsg = ""
+				return m, pruneCmd(m.docker, id)
+			default:
+				// Default: container removal
+				return m, removeContainerCmd(m.docker, id)
 			}
-			// Default: container removal
-			return m, removeContainerCmd(m.docker, id)
 		case "n", "N", "esc":
 			// User cancelled.
 			m.confirmDelete = false
@@ -271,9 +299,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case keyMatches(msg, km.Tab):
-		m.activePanel = (m.activePanel + 1) % 4
+		m.activePanel = (m.activePanel + 1) % panelCount
 		m.cursor = 0
 		// Event streaming is started in newModel/Init, so no lazy-start needed here.
+		if m.activePanel == PanelDiskUsage {
+			m.pruneResultMsg = ""
+			return m, fetchDiskUsageCmd(m.docker)
+		}
 
 	case keyMatches(msg, km.Refresh):
 		m.refreshing = true
@@ -287,6 +319,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.eventCancel = cancel
 			m.eventDisconnected = false
 			return m, tea.Batch(fetchDataCmd(m.docker), waitForEventCmd(m.eventCh))
+		}
+		if m.activePanel == PanelDiskUsage {
+			return m, fetchDiskUsageCmd(m.docker)
 		}
 		return m, fetchDataCmd(m.docker)
 
@@ -319,6 +354,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.pendingDeleteID = ref
 			m.confirmDelete = true
+		}
+		if m.activePanel == PanelDiskUsage && m.diskUsageLoaded {
+			rows := diskUsageRows(m.diskUsage)
+			if m.cursor < len(rows) {
+				m.pendingDeleteID = rows[m.cursor].key
+				m.confirmDelete = true
+			}
 		}
 
 	case keyMatches(msg, km.Chart):
@@ -399,6 +441,39 @@ func removeImageCmd(dc docker.DockerClient, id string) tea.Cmd {
 	}
 }
 
+// pruneCmd runs the prune action for one disk usage category
+// ("images", "containers", "volumes", or "buildcache").
+func pruneCmd(dc docker.DockerClient, category string) tea.Cmd {
+	return func() tea.Msg {
+		var freed float64
+		var err error
+		switch category {
+		case "images":
+			freed, err = dc.PruneImages()
+		case "containers":
+			freed, err = dc.PruneContainers()
+		case "volumes":
+			freed, err = dc.PruneVolumes()
+		case "buildcache":
+			freed, err = dc.PruneBuildCache()
+		}
+		if err != nil {
+			return pruneDoneMsg{category: category, err: err}
+		}
+		return pruneDoneMsg{category: category, freedMB: freed}
+	}
+}
+
+// categoryLabel returns the display label for a disk usage category key.
+func categoryLabel(key string) string {
+	for _, d := range diskUsageDefs {
+		if d.key == key {
+			return d.label
+		}
+	}
+	return key
+}
+
 // execShellCmd suspends the TUI and opens an interactive shell inside a running container.
 // It tries /bin/bash first, falls back to /bin/sh if bash is not available.
 // When the shell exits, Bubble Tea resumes and emits execDoneMsg.
@@ -450,6 +525,8 @@ func (m Model) activeListLen() int {
 		return len(m.images)
 	case PanelEvents:
 		return len(m.events)
+	case PanelDiskUsage:
+		return len(diskUsageRows(m.diskUsage))
 	}
 	return 0
 }

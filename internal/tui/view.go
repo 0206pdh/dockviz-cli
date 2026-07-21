@@ -63,6 +63,13 @@ func (m Model) renderDashboard() string {
 			}
 			return m.renderConfirmDelete(img.Tag, "image", subText)
 		}
+		if m.activePanel == PanelDiskUsage {
+			rows := diskUsageRows(m.diskUsage)
+			if m.cursor < len(rows) {
+				r := rows[m.cursor]
+				return m.renderConfirmDelete(r.label, "disk usage category", r.warning)
+			}
+		}
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
@@ -83,8 +90,11 @@ func (m Model) renderConfirmDelete(name, kind, subText string) string {
 		Width(50)
 
 	kindLabel := "Container"
-	if kind == "image" {
+	switch kind {
+	case "image":
 		kindLabel = "Tag"
+	case "disk usage category":
+		kindLabel = "Prune"
 	}
 
 	title := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorRed).Render("  ⚠  Confirm Delete")
@@ -114,6 +124,7 @@ func (m Model) renderTabs() string {
 		{" 🌐 Networks ", PanelNetworks},
 		{" 🗃  Images ", PanelImages},
 		{" 📋 Events ", PanelEvents},
+		{" 💾 Disk Usage ", PanelDiskUsage},
 	}
 
 	var parts []string
@@ -149,6 +160,8 @@ func (m Model) renderActivePanel() string {
 		return m.renderImages()
 	case PanelEvents:
 		return m.renderEvents()
+	case PanelDiskUsage:
+		return m.renderDiskUsage()
 	default:
 		return m.renderContainers()
 	}
@@ -362,6 +375,85 @@ func (m Model) renderImages() string {
 	return strings.Join(rows, "\n")
 }
 
+// diskUsageRow pairs a prune category's static metadata with its live breakdown.
+type diskUsageRow struct {
+	key     string // stable key passed to pruneCmd, e.g. "images"
+	label   string
+	cat     docker.DiskUsageCategory
+	warning string // shown in the confirm-delete dialog
+}
+
+// diskUsageDefs is the fixed display order and copy for each prunable category.
+var diskUsageDefs = []struct {
+	key     string
+	label   string
+	warning string
+}{
+	{"images", "Images",
+		"Removes dangling (untagged) images left behind by rebuilds.\nTagged images you're still using are not touched."},
+	{"containers", "Containers",
+		"Removes stopped containers.\nRunning and paused containers are not touched."},
+	{"volumes", "Local Volumes",
+		"Removes volumes not attached to any container.\nThis can permanently delete data stored in those volumes."},
+	{"buildcache", "Build Cache",
+		"Removes build cache layers not in use by a running build."},
+}
+
+// diskUsageRows zips diskUsageDefs with the live breakdown for rendering and key handling.
+func diskUsageRows(du docker.DiskUsageInfo) []diskUsageRow {
+	cats := map[string]docker.DiskUsageCategory{
+		"images":     du.Images,
+		"containers": du.Containers,
+		"volumes":    du.Volumes,
+		"buildcache": du.BuildCache,
+	}
+	rows := make([]diskUsageRow, 0, len(diskUsageDefs))
+	for _, d := range diskUsageDefs {
+		rows = append(rows, diskUsageRow{key: d.key, label: d.label, cat: cats[d.key], warning: d.warning})
+	}
+	return rows
+}
+
+// renderDiskUsage builds the `docker system df`-style breakdown table.
+// Selecting a row and pressing [d] prunes exactly that category; the
+// RECLAIMABLE column always matches what the prune action will free.
+func (m Model) renderDiskUsage() string {
+	header := ui.HeaderStyle.Render(
+		fmt.Sprintf("  %-16s %-7s %-7s %-10s %-12s", "TYPE", "TOTAL", "ACTIVE", "SIZE", "RECLAIMABLE"),
+	)
+	var rows []string
+	rows = append(rows, header)
+
+	for i, r := range diskUsageRows(m.diskUsage) {
+		cursor := "  "
+		if i == m.cursor {
+			cursor = "▶ "
+		}
+		reclaim := "-"
+		if r.cat.ReclaimMB > 0 {
+			reclaim = docker.FormatSize(r.cat.ReclaimMB)
+		}
+		row := fmt.Sprintf("%s%-16s %-7d %-7d %-10s %-12s",
+			cursor, r.label, r.cat.Total, r.cat.Active,
+			docker.FormatSize(r.cat.SizeMB), reclaim)
+		if i == m.cursor {
+			row = ui.SelectedRowStyle.Render(row)
+		}
+		rows = append(rows, row)
+	}
+
+	switch {
+	case !m.diskUsageLoaded:
+		rows = append(rows, "\n  "+lipgloss.NewStyle().Foreground(ui.ColorGray).Render("Loading disk usage..."))
+	case m.pruning:
+		rows = append(rows, "\n  "+lipgloss.NewStyle().Foreground(ui.ColorYellow).Render("↻ Pruning..."))
+	case m.pruneResultMsg != "":
+		rows = append(rows, "\n  "+lipgloss.NewStyle().Foreground(ui.ColorGreen).Render("✓ "+m.pruneResultMsg))
+	}
+
+	return strings.Join(rows, "\n")
+}
+
 // renderEvents shows a live-updating timeline of Docker container lifecycle events.
 // Events are displayed newest-first. The panel starts streaming when first visited.
 func (m Model) renderEvents() string {
@@ -563,6 +655,8 @@ func (m Model) renderFooter() string {
 		line2 = "[d] Delete image"
 	case PanelEvents:
 		line2 = "● live streaming  ·  events appear as they happen"
+	case PanelDiskUsage:
+		line2 = "[d] Prune selected category  ·  RECLAIMABLE = what pruning that row frees"
 	}
 	return "\n" + ui.FooterStyle.Render(line1) + "\n" + ui.FooterStyle.Render(line2)
 }

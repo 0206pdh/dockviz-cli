@@ -19,6 +19,17 @@ type DockerClient interface {
 	RemoveContainer(id string) error
 	// RemoveImage removes a local image by ID or tag.
 	RemoveImage(id string) error
+	// DiskUsage returns a docker-system-df-style breakdown of images,
+	// containers, volumes, and build cache.
+	DiskUsage() (DiskUsageInfo, error)
+	// PruneImages removes dangling (untagged) images.
+	PruneImages() (freedMB float64, err error)
+	// PruneContainers removes stopped containers.
+	PruneContainers() (freedMB float64, err error)
+	// PruneVolumes removes volumes not attached to any container.
+	PruneVolumes() (freedMB float64, err error)
+	// PruneBuildCache removes unused build cache layers.
+	PruneBuildCache() (freedMB float64, err error)
 	// StreamLogs streams the last 50 lines + live log output for a container.
 	// Cancel the provided context to stop the stream.
 	StreamLogs(ctx context.Context, id string) <-chan LogLine
