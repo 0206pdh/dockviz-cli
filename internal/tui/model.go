@@ -24,7 +24,11 @@ const (
 	PanelNetworks
 	PanelImages
 	PanelEvents
+	PanelDiskUsage
 )
+
+// panelCount is the number of panels the Tab key cycles through.
+const panelCount = 5
 
 // View represents the current screen displayed.
 type View int
@@ -47,6 +51,20 @@ type dataMsg struct {
 	err        error
 }
 
+// diskUsageMsg carries a freshly fetched disk usage breakdown back to Update.
+type diskUsageMsg struct {
+	info docker.DiskUsageInfo
+	err  error
+}
+
+// pruneDoneMsg is sent after a prune action (images/containers/volumes/build
+// cache) completes.
+type pruneDoneMsg struct {
+	category string
+	freedMB  float64
+	err      error
+}
+
 // Model is the entire application state.
 type Model struct {
 	// Build-time version string (e.g. "v0.2.3")
@@ -64,6 +82,12 @@ type Model struct {
 	containers []docker.ContainerInfo
 	networks   []docker.NetworkInfo
 	images     []docker.ImageInfo
+
+	// Disk usage panel state
+	diskUsage       docker.DiskUsageInfo
+	diskUsageLoaded bool   // true once the first DiskUsage() fetch has returned
+	pruning         bool   // true while a prune action is in flight
+	pruneResultMsg  string // transient "freed N MB" message shown after a prune completes
 
 	// Navigation
 	activePanel  Panel
@@ -210,5 +234,16 @@ func fetchDataCmd(dc docker.DockerClient) tea.Cmd {
 			networks:   networks,
 			images:     images,
 		}
+	}
+}
+
+// fetchDiskUsageCmd fetches the disk usage breakdown. It is only called when
+// the Disk Usage panel is active, since DiskUsage() queries images,
+// containers, volumes, and build cache in one daemon call and isn't cheap
+// enough to run on every 2s tick.
+func fetchDiskUsageCmd(dc docker.DockerClient) tea.Cmd {
+	return func() tea.Msg {
+		info, err := dc.DiskUsage()
+		return diskUsageMsg{info: info, err: err}
 	}
 }
