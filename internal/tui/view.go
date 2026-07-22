@@ -443,6 +443,9 @@ func (m Model) renderDiskUsage() string {
 			row = ui.SelectedRowStyle.Render(row)
 		}
 		rows = append(rows, row)
+		if r.cat.Unavailable != "" {
+			rows = append(rows, "  "+ui.ErrorStyle.Render("⚠ "+r.cat.Unavailable))
+		}
 	}
 
 	switch {

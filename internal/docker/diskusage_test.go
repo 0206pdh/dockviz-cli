@@ -3,6 +3,7 @@ package docker
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/docker/docker/api/types/image"
@@ -51,9 +52,9 @@ func TestBytesToMB(t *testing.T) {
 
 func TestLogFileSizes(t *testing.T) {
 	t.Run("empty path", func(t *testing.T) {
-		active, rotated := logFileSizes("")
-		if active != 0 || len(rotated) != 0 {
-			t.Errorf("logFileSizes(\"\") = (%v, %v), want (0, empty)", active, rotated)
+		active, rotated, denied := logFileSizes("")
+		if active != 0 || len(rotated) != 0 || denied {
+			t.Errorf("logFileSizes(\"\") = (%v, %v, %v), want (0, empty, false)", active, rotated, denied)
 		}
 	})
 
@@ -71,9 +72,12 @@ func TestLogFileSizes(t *testing.T) {
 		write(logPath+".2.gz", 512*1024)                      // rotated (compressed): 0.5MB
 		write(filepath.Join(dir, "other.log"), 999*1024*1024) // unrelated file, must be ignored
 
-		activeMB, rotatedMB := logFileSizes(logPath)
+		activeMB, rotatedMB, denied := logFileSizes(logPath)
 		if activeMB != 2 {
 			t.Errorf("activeMB = %v, want 2", activeMB)
+		}
+		if denied {
+			t.Error("permDenied = true, want false")
 		}
 		if len(rotatedMB) != 2 {
 			t.Fatalf("len(rotatedMB) = %d, want 2: %v", len(rotatedMB), rotatedMB)
@@ -86,10 +90,34 @@ func TestLogFileSizes(t *testing.T) {
 		}
 	})
 
+	t.Run("permission denied", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows ACLs don't produce a POSIX-style permission error via os.Chmod")
+		}
+		if os.Geteuid() == 0 {
+			t.Skip("running as root bypasses filesystem permission checks")
+		}
+
+		dir := t.TempDir()
+		logPath := filepath.Join(dir, "abc123-json.log")
+		if err := os.WriteFile(logPath, []byte("secret"), 0o644); err != nil {
+			t.Fatalf("WriteFile error = %v", err)
+		}
+		if err := os.Chmod(dir, 0o000); err != nil {
+			t.Fatalf("Chmod error = %v", err)
+		}
+		defer os.Chmod(dir, 0o755) // restore so t.TempDir() cleanup can remove it
+
+		_, _, denied := logFileSizes(logPath)
+		if !denied {
+			t.Error("permDenied = false, want true when the containing directory isn't traversable")
+		}
+	})
+
 	t.Run("nonexistent log path", func(t *testing.T) {
-		active, rotated := logFileSizes(filepath.Join(t.TempDir(), "missing-json.log"))
-		if active != 0 || len(rotated) != 0 {
-			t.Errorf("logFileSizes(missing) = (%v, %v), want (0, empty)", active, rotated)
+		active, rotated, denied := logFileSizes(filepath.Join(t.TempDir(), "missing-json.log"))
+		if active != 0 || len(rotated) != 0 || denied {
+			t.Errorf("logFileSizes(missing) = (%v, %v, %v), want (0, empty, false)", active, rotated, denied)
 		}
 	})
 }

@@ -6,6 +6,7 @@
 package docker
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -21,6 +22,10 @@ type DiskUsageCategory struct {
 	Active    int     // objects currently in use
 	SizeMB    float64 // total size on disk
 	ReclaimMB float64 // size Prune would free for this category
+	// Unavailable, when non-empty, explains why this category couldn't be
+	// fully measured (e.g. filesystem permission denied) so the TUI can
+	// show that instead of a misleadingly clean 0.
+	Unavailable string
 }
 
 // DiskUsageInfo is the full disk usage breakdown, one category per resource type.
@@ -99,12 +104,17 @@ func (c *Client) DiskUsage() (DiskUsageInfo, error) {
 	}
 
 	info.Logs.Label = "Container Logs"
+	deniedCount := 0
 	for _, ctr := range du.Containers {
 		inspect, err := c.cli.ContainerInspect(c.ctx, ctr.ID)
 		if err != nil {
 			continue
 		}
-		activeMB, rotated := logFileSizes(inspect.LogPath)
+		activeMB, rotated, denied := logFileSizes(inspect.LogPath)
+		if denied {
+			deniedCount++
+			continue
+		}
 		size := activeMB
 		for _, s := range rotated {
 			size += s
@@ -120,6 +130,13 @@ func (c *Client) DiskUsage() (DiskUsageInfo, error) {
 		if ctr.State == "running" || ctr.State == "paused" {
 			info.Logs.Active++
 		}
+	}
+	// /var/lib/docker/containers is root-owned on a typical native-Linux
+	// install; a `docker`-group user can talk to the daemon but can't read
+	// those files directly. Say so explicitly instead of showing a clean 0,
+	// which would look identical to "this container just has no logs".
+	if deniedCount > 0 {
+		info.Logs.Unavailable = fmt.Sprintf("permission denied on %d container(s) — try sudo", deniedCount)
 	}
 
 	return info, nil
@@ -187,7 +204,7 @@ func (c *Client) PruneLogs() (float64, error) {
 		if err != nil {
 			continue
 		}
-		activeMB, rotated := logFileSizes(inspect.LogPath)
+		activeMB, rotated, _ := logFileSizes(inspect.LogPath)
 		if inspect.LogPath != "" && activeMB > 0 {
 			if err := os.Truncate(inspect.LogPath, 0); err == nil {
 				freedMB += activeMB
@@ -232,22 +249,39 @@ func fileSizeMB(path string) float64 {
 // active file's size separately from the rotated ones because the two must
 // be reclaimed differently: the active file is truncated in place while
 // rotated files are removed outright (see PruneLogs).
-func logFileSizes(logPath string) (activeMB float64, rotatedMB map[string]float64) {
+//
+// permDenied reports whether the active log path exists but this process
+// lacks permission to read it. It's checked with a direct Stat on logPath
+// rather than inferred from the Glob results below: Glob silently returns
+// no matches (not an error) when it can't list the containing directory, so
+// relying on it would make "permission denied" indistinguishable from
+// "no log file". permDenied is left false for any other reason the log is
+// unreachable (no logPath, or it doesn't exist) since there's nothing
+// actionable to tell the user in those cases.
+func logFileSizes(logPath string) (activeMB float64, rotatedMB map[string]float64, permDenied bool) {
 	rotatedMB = map[string]float64{}
 	if logPath == "" {
-		return 0, rotatedMB
+		return 0, rotatedMB, false
 	}
+
+	fi, err := os.Stat(logPath)
+	if os.IsPermission(err) {
+		return 0, rotatedMB, true
+	}
+	if err != nil {
+		return 0, rotatedMB, false
+	}
+	activeMB = bytesToMB(fi.Size())
+
 	matches, err := filepath.Glob(logPath + "*")
 	if err != nil {
-		return 0, rotatedMB
+		return activeMB, rotatedMB, false
 	}
 	for _, m := range matches {
-		size := fileSizeMB(m)
 		if m == logPath {
-			activeMB = size
 			continue
 		}
-		rotatedMB[m] = size
+		rotatedMB[m] = fileSizeMB(m)
 	}
-	return activeMB, rotatedMB
+	return activeMB, rotatedMB, false
 }
