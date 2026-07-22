@@ -442,7 +442,7 @@ func removeImageCmd(dc docker.DockerClient, id string) tea.Cmd {
 }
 
 // pruneCmd runs the prune action for one disk usage category
-// ("images", "containers", "volumes", or "buildcache").
+// ("images", "containers", "volumes", "buildcache", or "logs").
 func pruneCmd(dc docker.DockerClient, category string) tea.Cmd {
 	return func() tea.Msg {
 		var freed float64
@@ -456,6 +456,8 @@ func pruneCmd(dc docker.DockerClient, category string) tea.Cmd {
 			freed, err = dc.PruneVolumes()
 		case "buildcache":
 			freed, err = dc.PruneBuildCache()
+		case "logs":
+			freed, err = dc.PruneLogs()
 		}
 		if err != nil {
 			return pruneDoneMsg{category: category, err: err}

@@ -397,6 +397,8 @@ var diskUsageDefs = []struct {
 		"Removes volumes not attached to any container.\nThis can permanently delete data stored in those volumes."},
 	{"buildcache", "Build Cache",
 		"Removes build cache layers not in use by a running build."},
+	{"logs", "Container Logs",
+		"Truncates container log files. `docker system df` never counts this space.\nContainers are not touched and keep running; logging just starts over from empty."},
 }
 
 // diskUsageRows zips diskUsageDefs with the live breakdown for rendering and key handling.
@@ -406,6 +408,7 @@ func diskUsageRows(du docker.DiskUsageInfo) []diskUsageRow {
 		"containers": du.Containers,
 		"volumes":    du.Volumes,
 		"buildcache": du.BuildCache,
+		"logs":       du.Logs,
 	}
 	rows := make([]diskUsageRow, 0, len(diskUsageDefs))
 	for _, d := range diskUsageDefs {

@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/docker/docker/api/types/image"
@@ -45,6 +47,51 @@ func TestBytesToMB(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLogFileSizes(t *testing.T) {
+	t.Run("empty path", func(t *testing.T) {
+		active, rotated := logFileSizes("")
+		if active != 0 || len(rotated) != 0 {
+			t.Errorf("logFileSizes(\"\") = (%v, %v), want (0, empty)", active, rotated)
+		}
+	})
+
+	t.Run("active file plus rotated siblings", func(t *testing.T) {
+		dir := t.TempDir()
+		logPath := filepath.Join(dir, "abc123-json.log")
+
+		write := func(path string, size int) {
+			if err := os.WriteFile(path, make([]byte, size), 0o644); err != nil {
+				t.Fatalf("WriteFile(%s) error = %v", path, err)
+			}
+		}
+		write(logPath, 2*1024*1024)                           // active: 2MB
+		write(logPath+".1", 1024*1024)                        // rotated: 1MB
+		write(logPath+".2.gz", 512*1024)                      // rotated (compressed): 0.5MB
+		write(filepath.Join(dir, "other.log"), 999*1024*1024) // unrelated file, must be ignored
+
+		activeMB, rotatedMB := logFileSizes(logPath)
+		if activeMB != 2 {
+			t.Errorf("activeMB = %v, want 2", activeMB)
+		}
+		if len(rotatedMB) != 2 {
+			t.Fatalf("len(rotatedMB) = %d, want 2: %v", len(rotatedMB), rotatedMB)
+		}
+		if rotatedMB[logPath+".1"] != 1 {
+			t.Errorf("rotatedMB[%s.1] = %v, want 1", logPath, rotatedMB[logPath+".1"])
+		}
+		if rotatedMB[logPath+".2.gz"] != 0.5 {
+			t.Errorf("rotatedMB[%s.2.gz] = %v, want 0.5", logPath, rotatedMB[logPath+".2.gz"])
+		}
+	})
+
+	t.Run("nonexistent log path", func(t *testing.T) {
+		active, rotated := logFileSizes(filepath.Join(t.TempDir(), "missing-json.log"))
+		if active != 0 || len(rotated) != 0 {
+			t.Errorf("logFileSizes(missing) = (%v, %v), want (0, empty)", active, rotated)
+		}
+	})
 }
 
 func TestDemoClientPruneShrinksDiskUsage(t *testing.T) {

@@ -19,6 +19,7 @@ type DemoClient struct {
 	containersPruned bool
 	volumesPruned    bool
 	buildCachePruned bool
+	logsPruned       bool
 }
 
 // NewDemoClient returns a demo client that needs no Docker daemon.
@@ -188,6 +189,7 @@ func (d *DemoClient) DiskUsage() (DiskUsageInfo, error) {
 		Containers: DiskUsageCategory{Label: "Containers", Total: 6, Active: 5, SizeMB: 62, ReclaimMB: 18},
 		Volumes:    DiskUsageCategory{Label: "Local Volumes", Total: 4, Active: 2, SizeMB: 512, ReclaimMB: 96},
 		BuildCache: DiskUsageCategory{Label: "Build Cache", Total: 37, Active: 2, SizeMB: 2870, ReclaimMB: 2560},
+		Logs:       DiskUsageCategory{Label: "Container Logs", Total: 6, Active: 5, SizeMB: 734, ReclaimMB: 734},
 	}
 	if d.imagesPruned {
 		info.Images.Total -= 3
@@ -208,6 +210,12 @@ func (d *DemoClient) DiskUsage() (DiskUsageInfo, error) {
 		info.BuildCache.Total -= 30
 		info.BuildCache.SizeMB -= 2560
 		info.BuildCache.ReclaimMB = 0
+	}
+	if d.logsPruned {
+		info.Logs.Total = 0
+		info.Logs.Active = 0
+		info.Logs.SizeMB = 0
+		info.Logs.ReclaimMB = 0
 	}
 	return info, nil
 }
@@ -238,6 +246,13 @@ func (d *DemoClient) PruneBuildCache() (float64, error) {
 	time.Sleep(400 * time.Millisecond)
 	d.buildCachePruned = true
 	return 2560, nil
+}
+
+// PruneLogs simulates truncating container log files.
+func (d *DemoClient) PruneLogs() (float64, error) {
+	time.Sleep(400 * time.Millisecond)
+	d.logsPruned = true
+	return 734, nil
 }
 
 // StreamLogs simulates a live log stream with pre-canned demo lines.
