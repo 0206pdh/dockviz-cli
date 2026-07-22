@@ -324,3 +324,43 @@ done"
 ```bash
 docker rm -f cpu-pulse cpu-wave cpu-sin
 ```
+
+---
+
+## 12. Disk Usage 패널의 Local Volumes 프룬이 표시된 것보다 적게 회수됨
+
+**증상**
+Disk Usage 패널이 Local Volumes에서 예를 들어 96MB를 reclaimable로 표시. `d`로 프룬해도 0MB 회수로 나오고, 다음 fetch에서도 96MB가 그대로 남아있음.
+
+**원인**
+`DiskUsage()`는 `RefCount == 0`인 모든 볼륨(이름 있든 없든)을 reclaimable로 계산했다. 반면 `PruneVolumes()`는 필터 없이 `VolumesPrune`을 호출했는데, Docker API 1.42 이상에서는 필터 없는 볼륨 프룬을 **익명(anonymous) 볼륨에만** 조용히 제한한다 (moby의 `volume/service/convert.go` — `withPrune`이 `all=true`를 명시하지 않으면 `label=AnonymousLabel` 필터를 자동으로 추가함). 컨테이너에 지금 당장 붙어있지 않은 이름 있는 볼륨(가장 흔한 케이스)은 `d`를 아무리 눌러도 전혀 삭제되지 않았다.
+
+**해결**
+`all=true`를 명시적으로 전달해서 패널에 표시된 것과 실제 프룬 대상을 일치시킴.
+
+```go
+// 수정 전
+report, err := c.cli.VolumesPrune(c.ctx, filters.NewArgs())
+
+// 수정 후
+report, err := c.cli.VolumesPrune(c.ctx, filters.NewArgs(filters.Arg("all", "true")))
+```
+
+**관련 파일**: `internal/docker/diskusage.go`
+
+---
+
+## 13. Docker Desktop / WSL2 환경에서 Container Logs 용량이 항상 0으로 나옴
+
+**증상**
+Windows나 macOS의 Docker Desktop 환경에서 Disk Usage 패널의 Container Logs 행이 항상 0을 보여줌. `docker logs <container>`로는 분명히 수 메가바이트 로그가 나오는데도 그렇다.
+
+**원인**
+Container Logs 카테고리는 `ContainerInspect(id).LogPath`를 읽어서 그 경로를 로컬 파일시스템에서 직접 stat한다 — 컨테이너 로그의 디스크 용량을 알려주는 Docker API 자체가 없어서 이 방법 말고는 측정할 수단이 없다. Docker Desktop은 `dockerd`가 별도 VM 안에서 돈다(WSL2 백엔드면 숨겨진 `docker-desktop` distro, Hyper-V/macOS면 별도 VM). 그래서 `LogPath`가 dockviz 자신의 파일시스템에는 존재하지 않는 경로를 가리키게 되고, `os.Stat`은 그냥 "파일 없음"을 반환한다 — 이건 "이 컨테이너가 아직 로그가 없는 것"과 구분이 안 된다.
+
+이건 일반적인 의미의 "버그"가 아니다 — 애초에 읽을 로컬 파일이 없는 상황이다. dockviz와 `dockerd`가 파일시스템을 공유할 때만 동작한다: `dockerd`가 호스트에 직접 설치된 순수 리눅스(rootful/rootless 무관), 또는 dockviz가 (Docker Desktop 연동이 아니라) `dockerd`가 직접 돌고 있는 것과 같은 WSL2 distro 안에서 실행되는 경우.
+
+**해결**
+별도 수정 없음. 지원 환경 제약으로 문서화 (`docs/testing-container-log-disk-usage.md`의 지원 환경 매트릭스 참고). 원격까지 지원하려면 로컬 경로를 stat하는 대신 `ContainerLogs`로 스트리밍하며 바이트를 세는 방식으로 바꿔야 함 — 후속 작업으로 `TODOS.md`에 남겨둠.
+
+**관련 파일**: `internal/docker/diskusage.go`

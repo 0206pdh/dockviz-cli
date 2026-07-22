@@ -297,3 +297,43 @@ Run two or three simultaneously and switch between them with `↑`/`↓` in the 
 ```bash
 docker rm -f cpu-pulse cpu-wave cpu-sin
 ```
+
+---
+
+## 12. Disk Usage panel's Local Volumes prune freed less than it reported
+
+**Symptom**
+The Disk Usage panel showed, say, 96MB reclaimable in Local Volumes. Pressing `d` to prune reported 0MB freed, and the row still showed the same 96MB on the next fetch.
+
+**Root cause**
+`DiskUsage()` counted every volume with `RefCount == 0` (named or anonymous) as reclaimable. `PruneVolumes()` called `VolumesPrune` with no filter — but on Docker API >=1.42 the daemon silently restricts an unfiltered volume prune to *anonymous* volumes only (`volume/service/convert.go` in moby: `withPrune` adds a `label=AnonymousLabel` filter unless the caller explicitly passes `all=true`). Named volumes that just aren't attached to a container right now — the common case — were never touched, no matter how many times you pressed `d`.
+
+**Fix**
+Pass `all=true` explicitly so the daemon prunes every unattached local volume, matching what the panel displays.
+
+```go
+// Before
+report, err := c.cli.VolumesPrune(c.ctx, filters.NewArgs())
+
+// After
+report, err := c.cli.VolumesPrune(c.ctx, filters.NewArgs(filters.Arg("all", "true")))
+```
+
+**File**: `internal/docker/diskusage.go`
+
+---
+
+## 13. Container Logs disk usage reads as 0 on Docker Desktop / WSL2
+
+**Symptom**
+On a Windows or macOS machine running Docker Desktop, the Disk Usage panel's Container Logs row always shows 0, even when `docker logs <container>` clearly returns megabytes of output.
+
+**Root cause**
+The Container Logs category reads `ContainerInspect(id).LogPath` and stats that path directly on the local filesystem — there's no Docker API that reports a container's on-disk log size, so this is the only way to measure it. On Docker Desktop, `dockerd` runs inside a separate VM (a hidden `docker-desktop` WSL2 distro, or a Hyper-V/xhyve VM on native Hyper-V/macOS setups), so `LogPath` points at a path that doesn't exist from dockviz's own filesystem — `os.Stat` just returns "not found", which is indistinguishable from "this container really has no logs yet".
+
+This is not a bug to "fix" in the usual sense — there is no local file to read. It only works when dockviz and `dockerd` share a filesystem: native Linux with `dockerd` installed directly on the host (rootful or rootless), or `dockerd` running inside the same WSL2 distro dockviz runs in (not the Docker Desktop integration).
+
+**Fix**
+None applied. Documented as a known environment constraint; see `docs/testing-container-log-disk-usage.md` for the supported-environment matrix. A remote-capable version would need to stream via `ContainerLogs` and count bytes instead of stat'ing a local path — tracked as a deferred item (see `TODOS.md`).
+
+**File**: `internal/docker/diskusage.go`
