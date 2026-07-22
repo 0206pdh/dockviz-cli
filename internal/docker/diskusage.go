@@ -112,8 +112,12 @@ func (c *Client) PruneContainers() (float64, error) {
 }
 
 // PruneVolumes removes local volumes not attached to any container.
+// The "all" filter is required because on API >=1.42 the daemon otherwise
+// restricts pruning to anonymous volumes only, which would silently leave
+// named-but-unattached volumes on disk despite DiskUsage reporting them
+// as reclaimable.
 func (c *Client) PruneVolumes() (float64, error) {
-	report, err := c.cli.VolumesPrune(c.ctx, filters.NewArgs())
+	report, err := c.cli.VolumesPrune(c.ctx, filters.NewArgs(filters.Arg("all", "true")))
 	if err != nil {
 		return 0, err
 	}
