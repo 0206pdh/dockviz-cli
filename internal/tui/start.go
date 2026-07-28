@@ -5,8 +5,8 @@ package tui
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/0206pdh/dockviz-cli/internal/docker"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Start connects to Docker (or uses demo data), builds the model, and runs the TUI.
@@ -25,7 +25,7 @@ func Start(demo bool, host string, version string) error {
 	}
 	defer dc.Close()
 
-	m := newModel(dc, version, host, demo)
+	m := newModel(dc, version, demo)
 
 	// Init() on the model handles the first fetch and tick automatically.
 	p := tea.NewProgram(m,

@@ -95,41 +95,6 @@ func (d *DemoClient) ListContainers() ([]ContainerInfo, error) {
 	}, nil
 }
 
-// ListNetworks returns fake network topology data with IPAM metadata.
-func (d *DemoClient) ListNetworks() ([]NetworkInfo, error) {
-	return []NetworkInfo{
-		{
-			ID:     "net001aabbcc",
-			Name:   "app-network",
-			Driver: "bridge",
-			Subnet: "172.20.0.0/16",
-			Containers: []ContainerEndpoint{
-				{Name: "nginx-proxy", IPv4: "172.20.0.2"},
-				{Name: "api-server", IPv4: "172.20.0.3"},
-				{Name: "worker", IPv4: "172.20.0.4"},
-			},
-		},
-		{
-			ID:     "net002bbccdd",
-			Name:   "db-network",
-			Driver: "bridge",
-			Subnet: "172.21.0.0/16",
-			Containers: []ContainerEndpoint{
-				{Name: "api-server", IPv4: "172.21.0.2"},
-				{Name: "postgres-db", IPv4: "172.21.0.3"},
-				{Name: "redis-cache", IPv4: "172.21.0.4"},
-			},
-		},
-		{
-			ID:         "net003ccddef",
-			Name:       "host",
-			Driver:     "host",
-			Subnet:     "",
-			Containers: []ContainerEndpoint{},
-		},
-	}, nil
-}
-
 // ListImages returns fake image data.
 func (d *DemoClient) ListImages() ([]ImageInfo, error) {
 	return []ImageInfo{
@@ -145,24 +110,6 @@ func (d *DemoClient) ListImages() ([]ImageInfo, error) {
 
 // Ping always succeeds in demo mode.
 func (d *DemoClient) Ping() error { return nil }
-
-// StartContainer simulates a start (prints nothing, just delays).
-func (d *DemoClient) StartContainer(id string) error {
-	time.Sleep(300 * time.Millisecond)
-	return nil
-}
-
-// StopContainer simulates a stop.
-func (d *DemoClient) StopContainer(id string) error {
-	time.Sleep(300 * time.Millisecond)
-	return nil
-}
-
-// RestartContainer simulates a restart.
-func (d *DemoClient) RestartContainer(id string) error {
-	time.Sleep(500 * time.Millisecond)
-	return nil
-}
 
 // FetchStats returns animated fake stats (not used — stats are inlined in ListContainers for demo).
 func (d *DemoClient) FetchStats(id string) (float64, float64, error) {
@@ -349,4 +296,3 @@ func (d *DemoClient) StreamEvents(ctx context.Context) <-chan EventInfo {
 	}()
 	return ch
 }
-

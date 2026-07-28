@@ -1,9 +1,10 @@
 // model.go defines the Bubble Tea Model — the single source of truth for all TUI state.
 //
 // Bubble Tea follows The Elm Architecture (TEA):
-//   Model  — what the app knows (state)
-//   Update — how state changes in response to messages
-//   View   — how state is rendered to the terminal
+//
+//	Model  — what the app knows (state)
+//	Update — how state changes in response to messages
+//	View   — how state is rendered to the terminal
 package tui
 
 import (
@@ -11,9 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0206pdh/dockviz-cli/internal/docker"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/0206pdh/dockviz-cli/internal/docker"
 )
 
 // Panel represents which section of the dashboard is active.
@@ -21,14 +22,19 @@ type Panel int
 
 const (
 	PanelContainers Panel = iota
-	PanelNetworks
 	PanelImages
-	PanelEvents
+	PanelProblems
 	PanelDiskUsage
 )
 
+// PanelNetworks is kept as a compatibility sentinel for retired view code.
+const PanelNetworks Panel = -1
+
+// PanelEvents is a compatibility alias for the retired event timeline label.
+const PanelEvents Panel = PanelProblems
+
 // panelCount is the number of panels the Tab key cycles through.
-const panelCount = 5
+const panelCount = 4
 
 // View represents the current screen displayed.
 type View int
@@ -46,7 +52,6 @@ type tickMsg time.Time
 // dataMsg carries freshly fetched Docker data back to Update.
 type dataMsg struct {
 	containers []docker.ContainerInfo
-	networks   []docker.NetworkInfo
 	images     []docker.ImageInfo
 	err        error
 }
@@ -70,8 +75,6 @@ type Model struct {
 	// Build-time version string (e.g. "v0.2.3")
 	version string
 
-	// Remote host override (empty = local daemon). Used when spawning `docker exec`.
-	host string
 	// demo is true when running with the DemoClient (no real daemon).
 	demo bool
 
@@ -80,7 +83,6 @@ type Model struct {
 
 	// Current data
 	containers []docker.ContainerInfo
-	networks   []docker.NetworkInfo
 	images     []docker.ImageInfo
 
 	// Disk usage panel state
@@ -90,10 +92,10 @@ type Model struct {
 	pruneResultMsg  string // transient "freed N MB" message shown after a prune completes
 
 	// Navigation
-	activePanel  Panel
-	activeView   View
-	cursor       int // selected row index in active list
-	selectedID   string
+	activePanel Panel
+	activeView  View
+	cursor      int // selected row index in active list
+	selectedID  string
 
 	// UI helpers
 	keys    KeyMap
@@ -118,20 +120,17 @@ type Model struct {
 	memHistory map[string][]float64
 
 	// Log streaming state
-	logs      []string             // accumulated log lines for the current container
-	logScroll int                  // scroll offset (0 = top, len(logs) = bottom)
+	logs      []string              // accumulated log lines for the current container
+	logScroll int                   // scroll offset (0 = top, len(logs) = bottom)
 	logCh     <-chan docker.LogLine // channel receiving live log lines
-	logCancel context.CancelFunc   // call to stop the streaming goroutine
+	logCancel context.CancelFunc    // call to stop the streaming goroutine
 
 	// Event timeline state
-	events             []docker.EventInfo    // container lifecycle events, newest first, capped at 100
-	eventCh            <-chan docker.EventInfo // channel receiving live events
-	eventCancel        context.CancelFunc    // call to stop the event streaming goroutine
-	eventDisconnected  bool                  // true when the daemon dropped the event stream
+	events            []docker.EventInfo      // container lifecycle events, newest first, capped at 100
+	eventCh           <-chan docker.EventInfo // channel receiving live events
+	eventCancel       context.CancelFunc      // call to stop the event streaming goroutine
+	eventDisconnected bool                    // true when the daemon dropped the event stream
 
-	// ContainerStates tracks the last-known health of each container derived from
-	// the event stream. Keyed by container name. Used to colorise topology nodes.
-	ContainerStates map[string]docker.ContainerState
 }
 
 // Init implements tea.Model. Starts the spinner, first data fetch, and event streaming.
@@ -143,7 +142,7 @@ func (m Model) Init() tea.Cmd {
 
 // newModel creates the initial Model. Accepts any DockerClient (real or demo).
 // Event streaming is started here so Init() can register the first waitForEventCmd.
-func newModel(dc docker.DockerClient, version, host string, demo bool) Model {
+func newModel(dc docker.DockerClient, version string, demo bool) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 
@@ -152,7 +151,6 @@ func newModel(dc docker.DockerClient, version, host string, demo bool) Model {
 
 	return Model{
 		version:         version,
-		host:            host,
 		demo:            demo,
 		docker:          dc,
 		activePanel:     PanelContainers,
@@ -164,7 +162,6 @@ func newModel(dc docker.DockerClient, version, host string, demo bool) Model {
 		memHistory:      make(map[string][]float64),
 		eventCh:         eventCh,
 		eventCancel:     eventCancel,
-		ContainerStates: make(map[string]docker.ContainerState),
 	}
 }
 
@@ -176,29 +173,24 @@ func tickCmd() tea.Cmd {
 }
 
 // fetchDataCmd fetches all Docker data concurrently and returns a dataMsg.
-// Containers, networks, and images are fetched in parallel goroutines.
+// Containers and images are fetched in parallel goroutines.
 // For running containers, CPU/memory stats are fetched in a second parallel pass.
 func fetchDataCmd(dc docker.DockerClient) tea.Cmd {
 	return func() tea.Msg {
 		var (
 			containers []docker.ContainerInfo
-			networks   []docker.NetworkInfo
 			images     []docker.ImageInfo
-			cErr, nErr, iErr error
+			cErr, iErr error
 		)
 
 		var wg sync.WaitGroup
-		wg.Add(3)
+		wg.Add(2)
 		go func() { defer wg.Done(); containers, cErr = dc.ListContainers() }()
-		go func() { defer wg.Done(); networks, nErr = dc.ListNetworks() }()
 		go func() { defer wg.Done(); images, iErr = dc.ListImages() }()
 		wg.Wait()
 
 		if cErr != nil {
 			return dataMsg{err: cErr}
-		}
-		if nErr != nil {
-			return dataMsg{err: nErr}
 		}
 		if iErr != nil {
 			return dataMsg{err: iErr}
@@ -231,7 +223,6 @@ func fetchDataCmd(dc docker.DockerClient) tea.Cmd {
 
 		return dataMsg{
 			containers: containers,
-			networks:   networks,
 			images:     images,
 		}
 	}

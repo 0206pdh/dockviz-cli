@@ -9,12 +9,8 @@ import "context"
 // The real Client and DemoClient both satisfy it.
 type DockerClient interface {
 	ListContainers() ([]ContainerInfo, error)
-	ListNetworks() ([]NetworkInfo, error)
 	ListImages() ([]ImageInfo, error)
 	FetchStats(id string) (cpu float64, memMB float64, err error)
-	StartContainer(id string) error
-	StopContainer(id string) error
-	RestartContainer(id string) error
 	// RemoveContainer force-removes a container (running or stopped).
 	RemoveContainer(id string) error
 	// RemoveImage removes a local image by ID or tag.

@@ -7,9 +7,9 @@ import (
 	"math"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/0206pdh/dockviz-cli/internal/docker"
 	"github.com/0206pdh/dockviz-cli/internal/ui"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // View is called by Bubble Tea after every Update to re-render the screen.
@@ -129,6 +129,12 @@ func (m Model) renderTabs() string {
 
 	var parts []string
 	for _, t := range tabs {
+		if t.panel == PanelNetworks {
+			continue
+		}
+		if t.panel == PanelProblems {
+			t.label = " ⚠ Problems "
+		}
 		if t.panel == m.activePanel {
 			parts = append(parts, lipgloss.NewStyle().
 				Bold(true).
@@ -154,12 +160,10 @@ func (m Model) renderTabs() string {
 // renderActivePanel renders whichever panel is currently selected.
 func (m Model) renderActivePanel() string {
 	switch m.activePanel {
-	case PanelNetworks:
-		return m.renderNetworks()
 	case PanelImages:
 		return m.renderImages()
-	case PanelEvents:
-		return m.renderEvents()
+	case PanelProblems:
+		return m.renderProblems()
 	case PanelDiskUsage:
 		return m.renderDiskUsage()
 	default:
@@ -240,6 +244,10 @@ func (m Model) renderContainers() string {
 // When m.width < 80 (narrow terminal or before the first WindowSizeMsg) it falls
 // back to a simple network list to avoid layout corruption.
 func (m Model) renderNetworks() string {
+	return ""
+}
+
+/*
 	if m.width < 80 {
 		return m.renderNetworksFallback()
 	}
@@ -351,6 +359,8 @@ func (m Model) renderNetworksFallback() string {
 	}
 	return strings.Join(rows, "\n")
 }
+
+*/
 
 // renderImages builds the image list table.
 func (m Model) renderImages() string {
@@ -571,9 +581,6 @@ func (m Model) renderDetail() string {
 		}
 
 		footerParts := "[Esc] Back"
-		if c.Status == "running" && !m.demo {
-			footerParts += "  •  [e] Exec shell"
-		}
 		lines = append(lines, "", "  "+ui.FooterStyle.Render(footerParts))
 
 		return strings.Join(lines, "\n")
@@ -659,10 +666,16 @@ func (m Model) renderFooter() string {
 		line2 = "● running  ◑ restarting  ✗ dead  ○ unknown  ·  [↑↓] select network"
 	case PanelImages:
 		line2 = "[d] Delete image"
-	case PanelEvents:
+	case PanelProblems:
 		line2 = "● live streaming  ·  events appear as they happen"
 	case PanelDiskUsage:
 		line2 = "[d] Prune selected category  ·  RECLAIMABLE = what pruning that row frees"
+	}
+	if m.activePanel == PanelContainers {
+		line2 = "[Enter] Detail  [d] Delete  [l] Logs  [g] Chart"
+	}
+	if m.activePanel == PanelProblems {
+		line2 = "[Enter] inspect  ·  live problem detection"
 	}
 	return "\n" + ui.FooterStyle.Render(line1) + "\n" + ui.FooterStyle.Render(line2)
 }

@@ -6,19 +6,15 @@ package tui
 import (
 	"context"
 	"fmt"
-	"os/exec"
 
+	"github.com/0206pdh/dockviz-cli/internal/docker"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/0206pdh/dockviz-cli/internal/docker"
 )
 
 // logLineMsg carries a single log line received from the streaming goroutine.
 type logLineMsg string
-
-// execDoneMsg is sent after the interactive exec process exits.
-type execDoneMsg struct{ err error }
 
 // eventMsg carries a single Docker lifecycle event from the streaming goroutine.
 type eventMsg docker.EventInfo
@@ -53,7 +49,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 		m.containers = msg.containers
-		m.networks = msg.networks
 		m.images = msg.images
 		// Clamp cursor to list length
 		m.cursor = clamp(m.cursor, 0, m.activeListLen()-1)
@@ -104,41 +99,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.events = m.events[:100]
 		}
 
-		// Update ContainerStates based on the event action.
-		// State transition table mirrors the one in internal/docker/state.go.
-		switch ei.Action {
-		case "start":
-			m.ContainerStates[ei.ContainerName] = docker.ContainerState{
-				Status:    "running",
-				UpdatedAt: ei.Time,
-			}
-		case "restart":
-			cs := m.ContainerStates[ei.ContainerName]
-			cs.Status = "restarting"
-			cs.RestartCount++
-			cs.UpdatedAt = ei.Time
-			m.ContainerStates[ei.ContainerName] = cs
-		case "die":
-			m.ContainerStates[ei.ContainerName] = docker.ContainerState{
-				Status:    "dead",
-				ExitCode:  ei.ExitCode,
-				OOMKilled: ei.OOMKilled,
-				UpdatedAt: ei.Time,
-			}
-		case "destroy":
-			delete(m.ContainerStates, ei.ContainerName)
-		}
-
 		if m.eventCh != nil {
 			return m, waitForEventCmd(m.eventCh)
 		}
 		return m, nil
 
 	// Interactive exec process returned — resume TUI on the dashboard.
-	case execDoneMsg:
-		m.activeView = ViewDashboard
-		return m, fetchDataCmd(m.docker)
-
 	// Disk usage breakdown arrived
 	case diskUsageMsg:
 		m.diskUsageLoaded = true
@@ -211,13 +177,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case keyMatches(msg, km.Back):
 			m.activeView = ViewDashboard
-		case keyMatches(msg, km.Exec):
-			// Find the selected container by ID and exec if running.
-			for _, c := range m.containers {
-				if c.ID == m.selectedID && c.Status == "running" && !m.demo {
-					return m, execShellCmd(c.Name, m.host)
-				}
-			}
 		}
 		return m, nil
 	}
@@ -334,12 +293,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.activeView = ViewDetail
 		}
 
-	case keyMatches(msg, km.Toggle):
-		if m.activePanel == PanelContainers && len(m.containers) > 0 {
-			ctr := m.containers[m.cursor]
-			return m, toggleContainerCmd(m.docker, ctr.ID, ctr.Status)
-		}
-
 	case keyMatches(msg, km.Delete):
 		// Capture the ID now so auto-refresh can't change it before "y" is pressed.
 		if m.activePanel == PanelContainers && len(m.containers) > 0 {
@@ -388,35 +341,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, waitForLogCmd(ch)
 		}
 
-	case keyMatches(msg, km.Exec):
-		// Suspend the TUI and exec an interactive shell inside the selected container.
-		// Only available for running containers; no-op in demo mode.
-		if m.activePanel == PanelContainers && len(m.containers) > 0 {
-			ctr := m.containers[m.cursor]
-			if ctr.Status == "running" && !m.demo {
-				return m, execShellCmd(ctr.Name, m.host)
-			}
-		}
 	}
 
 	return m, nil
-}
-
-// toggleContainerCmd starts or stops a container depending on its current status.
-func toggleContainerCmd(dc docker.DockerClient, id, status string) tea.Cmd {
-	return func() tea.Msg {
-		var err error
-		if status == "running" {
-			err = dc.StopContainer(id)
-		} else {
-			err = dc.StartContainer(id)
-		}
-		if err != nil {
-			return dataMsg{err: err}
-		}
-		// Fetch fresh data right after the action
-		return fetchDataCmd(dc)()
-	}
 }
 
 // removeContainerCmd force-removes a container then refreshes the container list.
@@ -476,20 +403,8 @@ func categoryLabel(key string) string {
 	return key
 }
 
-// execShellCmd suspends the TUI and opens an interactive shell inside a running container.
 // It tries /bin/bash first, falls back to /bin/sh if bash is not available.
 // When the shell exits, Bubble Tea resumes and emits execDoneMsg.
-func execShellCmd(containerName, host string) tea.Cmd {
-	args := []string{"exec", "-it", containerName, "sh", "-c", "bash 2>/dev/null || sh"}
-	if host != "" {
-		args = append([]string{"-H", host}, args...)
-	}
-	cmd := exec.Command("docker", args...)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execDoneMsg{err: err}
-	})
-}
-
 // waitForLogCmd blocks until the next line arrives on ch, then emits it as a logLineMsg.
 // Returns nil when the channel is closed (stream ended).
 func waitForLogCmd(ch <-chan docker.LogLine) tea.Cmd {
@@ -521,12 +436,10 @@ func (m Model) activeListLen() int {
 	switch m.activePanel {
 	case PanelContainers:
 		return len(m.containers)
-	case PanelNetworks:
-		return len(m.networks)
 	case PanelImages:
 		return len(m.images)
-	case PanelEvents:
-		return len(m.events)
+	case PanelProblems:
+		return len(m.problems())
 	case PanelDiskUsage:
 		return len(diskUsageRows(m.diskUsage))
 	}

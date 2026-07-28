@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/0206pdh/dockviz-cli/internal/tui"
+	"github.com/spf13/cobra"
 )
 
 var demoMode bool
@@ -18,10 +18,11 @@ var dockerHost string
 var rootCmd = &cobra.Command{
 	Use:   "dockviz",
 	Short: "Interactive Docker environment visualizer",
-	Long: `dockviz-cli is a TUI dashboard for monitoring your Docker environment.
+	Long: `dockviz-cli is a TUI dashboard for monitoring Docker containers,
+diagnosing active problems, and understanding disk usage.
 
-It shows real-time container stats, network topology, and lets you
-start/stop containers directly from the terminal.
+It shows real-time container stats and logs, derives actionable problems
+from Docker events, and provides guarded disk cleanup actions.
 
 Run with --demo to preview the dashboard without a running Docker daemon.`,
 	Example: `  dockviz                                  # connect to local Docker daemon
