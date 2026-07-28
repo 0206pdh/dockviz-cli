@@ -39,14 +39,15 @@ func TestDiskUsageRows(t *testing.T) {
 		Containers: docker.DiskUsageCategory{Total: 6, ReclaimMB: 18},
 		Volumes:    docker.DiskUsageCategory{Total: 4, ReclaimMB: 96},
 		BuildCache: docker.DiskUsageCategory{Total: 37, ReclaimMB: 2560},
+		Logs:       docker.DiskUsageCategory{Total: 6, ReclaimMB: 734},
 	}
 
 	rows := diskUsageRows(du)
-	if len(rows) != 4 {
-		t.Fatalf("diskUsageRows() returned %d rows, want 4", len(rows))
+	if len(rows) != 5 {
+		t.Fatalf("diskUsageRows() returned %d rows, want 5", len(rows))
 	}
 
-	wantKeys := []string{"images", "containers", "volumes", "buildcache"}
+	wantKeys := []string{"images", "containers", "volumes", "buildcache", "logs"}
 	for i, want := range wantKeys {
 		if rows[i].key != want {
 			t.Errorf("rows[%d].key = %q, want %q", i, rows[i].key, want)

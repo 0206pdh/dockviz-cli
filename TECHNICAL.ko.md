@@ -743,6 +743,36 @@ docker exec -it <name> sh -c "bash 2>/dev/null || sh"
 
 `--host`가 있으면 `docker -H <host> exec ...`로 전달한다. Bubble Tea가 TUI를 일시 정지하고 서브프로세스에 터미널을 넘긴다. 프로세스가 종료되면 `execDoneMsg`가 들어오고 대시보드가 재개되면서 데이터를 다시 fetch한다. 실행 중인 실제 container에서만 가능하며 DemoClient에서는 no-op이다.
 
+### 12-4. Disk Usage 프룬 — 카테고리별 안전 기본값과 ReclaimMB 불변식
+
+`internal/docker/diskusage.go`는 `docker system df`에 대응하는 5개 카테고리(Images/Containers/Volumes/BuildCache/Logs)마다 프룬 액션을 하나씩 노출한다. 설계 원칙은 하나다 — **각 카테고리가 표시하는 `ReclaimMB`는 그 카테고리의 `Prune*` 메서드가 실제로 회수하는 양과 항상 정확히 일치해야 한다.** 사용자가 화면에서 본 숫자를 믿고 눌렀는데 실제로는 덜 회수되는 상황을 만들지 않기 위함이다.
+
+카테고리별 안전 기본값:
+
+```text
+Images      dangling=true 필터만 사용 → docker image prune -a가 아니라 docker image prune과 동일.
+            태그가 남아있는 이미지는 절대 건드리지 않는다.
+
+Containers  필터 없이 ContainersPrune 호출 → created/exited/dead만 대상.
+            running/paused는 애초에 Active로 분류되어 대상에서 제외된다.
+
+Volumes     VolumesPrune(all=true)를 명시적으로 전달해야 한다. Docker API 1.42 이상은
+            필터 없는 프룬을 익명 볼륨에만 조용히 제한하기 때문에(moby
+            volume/service/convert.go의 withPrune), 이름 있는 미사용 볼륨까지 잡으려면
+            all=true가 필수다. (docs/troubleshooting.ko.md#12에 이 불변식이 깨졌던
+            실제 버그 기록이 있다.)
+
+Logs        컨테이너를 절대 건드리지 않는다. 활성 로그 파일은 os.Truncate로 in-place
+            truncate — 데몬이 컨테이너 생존 기간 내내 그 파일의 fd를 열어두고 있어서,
+            os.Remove로 지우면 데몬이 그 파일을 다시 열기 전까지 디스크 공간이 안
+            풀린다. 회전된 파일(<LogPath>.1, .2, ...)은 열려있는 fd가 없으므로
+            os.Remove로 완전히 삭제한다.
+```
+
+Logs 카테고리는 running 여부와 무관하게 발견된 모든 바이트가 100% reclaimable이다 — 다른 카테고리와 달리 "Active면 보호"라는 규칙이 적용되지 않는다. truncate는 컨테이너를 멈추지 않고도 항상 안전하기 때문이다.
+
+**권한 실패는 조용한 0이 아니라 명시적으로 알린다.** `logFileSizes`는 `Glob`의 매치 결과로 권한 문제를 추론하지 않는다 — `Glob`은 디렉토리를 못 읽어도 에러 없이 매치 0개를 반환하므로, 그렇게 하면 "권한 없음"과 "로그가 원래 없음"을 구분할 수 없다. 대신 `os.Stat(logPath)`를 직접 호출해 `os.IsPermission(err)`으로 판별한다. 권한이 거부된 컨테이너가 있으면 `DiskUsageCategory.Unavailable`에 `"permission denied on N container(s) — try sudo"`를 채워 TUI가 그 카테고리 행 아래 경고로 표시하게 한다 (`internal/tui/view.go`의 `renderDiskUsage`).
+
 ---
 
 ## 13. 오류, 취소, 리소스 수명
@@ -906,6 +936,10 @@ pip install dockviz
 ### 원격 셸의 별도 조건
 
 목록·stats·logs·events·Pull은 Docker SDK endpoint를 사용하지만 셸 접속은 로컬 `docker` CLI를 실행한다. 따라서 원격 셸까지 사용하려면 로컬 Docker CLI가 설치되어 있고 동일 endpoint에 접근할 수 있어야 한다.
+
+### Container Logs 카테고리의 별도 조건
+
+Disk Usage 패널의 Logs 카테고리도 셸 접속과 같은 종류의 제약이 있다 — Docker SDK API가 아니라 `ContainerInspect`로 얻은 `LogPath`를 dockviz 프로세스가 직접 로컬 파일시스템에서 stat/truncate한다. dockviz와 `dockerd`가 파일시스템을 공유할 때만 동작한다: 네이티브 리눅스, 또는 `dockerd`가 직접 도는 WSL2 distro. Docker Desktop(WSL2/Hyper-V 백엔드)이나 원격 `--host`에서는 `LogPath`가 dockviz 프로세스 입장에서 존재하지 않는 경로라 에러 없이 `0`으로 읽힌다. 상세 환경 매트릭스는 `docs/testing-container-log-disk-usage.ko.md` 참고.
 
 ### 데이터 신선도
 

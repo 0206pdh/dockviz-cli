@@ -48,6 +48,7 @@ Each command is simple, but when you're running several containers at once you e
 | Manually type `docker rm -f` | `d` key with a confirmation overlay; multi-tag images are protected |
 | `docker pull` raw text output | Per-layer progress bars |
 | Guessing which container failed and why | Event timeline + topology node colours show failure propagation instantly |
+| `docker system df` doesn't count container logs at all | Disk Usage panel adds a Container Logs category — a common source of disk usage no raw Docker command shows you |
 
 A single static binary. No runtime dependencies. Drop it on any server and run.
 
@@ -289,6 +290,27 @@ DOCKER_HOST=tcp://192.168.1.100:2375 dockviz
 
 `--host` takes precedence over `DOCKER_HOST`. Both work with the `pull` subcommand as well.
 
+### 13. Disk Usage panel — `d` key
+
+A `docker system df`-style breakdown with one prune action per row: Images (dangling only), Containers (stopped only), Local Volumes (unattached), Build Cache, and **Container Logs**.
+
+```
+  TYPE             TOTAL   ACTIVE  SIZE       RECLAIMABLE
+▶ Images           9       5       1.2 GB     410 MB
+  Containers       6       5       62 MB      18 MB
+  Local Volumes    4       2       512 MB     96 MB
+  Build Cache      37      2       2.9 GB     2.6 GB
+  Container Logs   6       5       734 MB     734 MB
+```
+
+Container Logs is the odd one out — `docker system df` doesn't account for log files at all, so this is disk usage no raw Docker command shows you. It reads each container's `LogPath` directly and, on prune, truncates the active file in place (never removes it — the daemon holds it open for the container's lifetime, so a plain `rm` wouldn't free the space until the daemon reopened it) while removing any rotated siblings (`.1`, `.2`, ...) outright. The container itself is never touched.
+
+Two constraints worth knowing before you rely on it:
+- **Needs local filesystem access to the daemon.** Works on native Linux (rootful or rootless) or a WSL2 distro running `dockerd` directly. Reads as a clean `0` — not an error — on Docker Desktop (Windows/macOS) or a remote `--host`, since the log file physically isn't reachable from dockviz's own filesystem.
+- **Needs read/write permission on `/var/lib/docker/containers`.** That directory is root-owned on a typical native-Linux install; a `docker`-group user can talk to the daemon fine but can't read those files directly. In that case the row shows `⚠ permission denied on N container(s) — try sudo` instead of a misleading `0`.
+
+Every other category's RECLAIMABLE number always matches what pressing `d` actually frees — see `docs/testing-container-log-disk-usage.md` for how that's verified.
+
 ---
 
 ## Keyboard Shortcuts
@@ -296,13 +318,13 @@ DOCKER_HOST=tcp://192.168.1.100:2375 dockviz
 | Key | Action |
 |-----|--------|
 | `q` / `Ctrl+C` | Quit |
-| `Tab` | Switch panel (Containers → Networks → Images → Events) |
+| `Tab` | Switch panel (Containers → Networks → Images → Events → Disk Usage) |
 | `↑` / `k` | Move up |
 | `↓` / `j` | Move down |
 | `Enter` | Open container detail |
 | `Esc` | Go back / close overlay |
 | `s` | Start / Stop selected container |
-| `d` | Delete selected container or image tag *(with confirmation)* |
+| `d` | Delete selected container or image tag; on the Disk Usage panel, prune the selected category *(with confirmation)* |
 | `l` | Open live log stream |
 | `r` | Force refresh / reconnect event stream |
 | `g` | Open full-screen CPU/MEM history chart for selected container |
@@ -484,6 +506,8 @@ The `curl` one-liner on the install section always resolves to the latest releas
 - [x] Dynamic CPU Y-axis — auto-scales beyond 100% for multi-core containers
 - [x] Volume mount display in container detail view
 - [x] Interactive exec shell — `e` key suspends TUI and opens shell in container
+- [x] Disk Usage panel — `docker system df`-style breakdown with per-category prune (`d` key)
+- [x] Container Logs disk usage category — surfaces log-file bloat `docker system df` doesn't account for
 
 ---
 

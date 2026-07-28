@@ -48,6 +48,7 @@ docker images
 | `docker rm -f` 명령어를 직접 입력 | `d` 키로 확인 팝업 후 삭제, 멀티 태그 이미지 안전 보호 |
 | `docker pull`의 텍스트 출력 | 레이어별 프로그레스 바로 시각화 |
 | 컨테이너 장애 발생 시 원인 파악 어려움 | 이벤트 타임라인 + 토폴로지 노드 색상으로 장애 전파 즉시 확인 |
+| `docker system df`는 컨테이너 로그 용량을 아예 안 잡음 | Disk Usage 패널에 Container Logs 카테고리 추가 — raw Docker 명령으로는 안 보이는 흔한 디스크 낭비 원인 |
 
 단일 바이너리 하나로 어느 서버에서든 바로 실행됩니다. 런타임 의존성 없음.
 
@@ -289,6 +290,27 @@ DOCKER_HOST=tcp://192.168.1.100:2375 dockviz
 
 `--host`가 `DOCKER_HOST`보다 우선합니다. `pull` 서브커맨드에도 동일하게 적용됩니다.
 
+### 13. Disk Usage 패널 — `d` 키
+
+`docker system df`와 비슷한 분류별 breakdown에, 행마다 프룬 액션이 하나씩 붙어있습니다: Images(dangling만), Containers(정지된 것만), Local Volumes(연결 안 된 것), Build Cache, 그리고 **Container Logs**.
+
+```
+  TYPE             TOTAL   ACTIVE  SIZE       RECLAIMABLE
+▶ Images           9       5       1.2 GB     410 MB
+  Containers       6       5       62 MB      18 MB
+  Local Volumes    4       2       512 MB     96 MB
+  Build Cache      37      2       2.9 GB     2.6 GB
+  Container Logs   6       5       734 MB     734 MB
+```
+
+Container Logs는 좀 특이합니다 — `docker system df`가 애초에 로그 파일을 전혀 안 잡기 때문에, raw Docker 명령으로는 볼 수 없는 디스크 사용량입니다. 각 컨테이너의 `LogPath`를 직접 읽고, 프룬 시 활성 로그 파일은 in-place로 truncate합니다(삭제하지 않음 — 데몬이 컨테이너 생존 기간 내내 fd를 열어두고 있어서, 그냥 `rm`으로는 데몬이 그 파일을 다시 열기 전까지 공간이 안 풀립니다). 회전된 파일(`.1`, `.2`, ...)은 완전히 삭제합니다. 컨테이너 자체는 절대 건드리지 않습니다.
+
+믿고 쓰기 전에 알아둘 제약이 두 가지 있습니다:
+- **데몬의 로컬 파일시스템에 접근할 수 있어야 합니다.** 네이티브 리눅스(rootful/rootless 무관)나 `dockerd`가 직접 도는 WSL2 distro에서는 동작합니다. Docker Desktop(Windows/macOS)이나 원격 `--host`에서는 에러가 아니라 그냥 깔끔하게 `0`으로 보입니다 — 로그 파일이 물리적으로 dockviz의 파일시스템에서 접근 불가능한 위치에 있기 때문입니다.
+- **`/var/lib/docker/containers`에 대한 read/write 권한이 필요합니다.** 이 디렉토리는 일반적인 네이티브 리눅스 설치 기준 root 소유라, `docker` 그룹 유저는 데몬과는 통신되지만 이 파일들을 직접 읽을 순 없습니다. 이 경우 오해의 소지가 있는 `0` 대신 `⚠ permission denied on N container(s) — try sudo`가 행 아래 표시됩니다.
+
+다른 카테고리들의 RECLAIMABLE 수치는 항상 `d`를 눌렀을 때 실제로 회수되는 양과 일치합니다 — 검증 방법은 `docs/testing-container-log-disk-usage.ko.md` 참고.
+
 ---
 
 ## 키보드 단축키 전체
@@ -296,13 +318,13 @@ DOCKER_HOST=tcp://192.168.1.100:2375 dockviz
 | 키 | 동작 |
 |----|------|
 | `q` / `Ctrl+C` | 종료 |
-| `Tab` | 패널 전환 (Containers → Networks → Images → Events) |
+| `Tab` | 패널 전환 (Containers → Networks → Images → Events → Disk Usage) |
 | `↑` / `k` | 위로 이동 |
 | `↓` / `j` | 아래로 이동 |
 | `Enter` | 컨테이너 상세 보기 |
 | `Esc` | 뒤로 가기 / 오버레이 닫기 |
 | `s` | 선택한 컨테이너 시작 / 정지 |
-| `d` | 선택한 컨테이너 또는 이미지 태그 삭제 *(확인 필요)* |
+| `d` | 선택한 컨테이너 또는 이미지 태그 삭제, Disk Usage 패널에서는 선택한 카테고리 프룬 *(확인 필요)* |
 | `l` | 실시간 로그 스트리밍 |
 | `r` | 강제 새로고침 / 이벤트 스트림 끊김 시 재연결 |
 | `g` | 선택한 컨테이너의 CPU/MEM 히스토리 전체 화면 차트 열기 |
@@ -480,6 +502,8 @@ Actions 동작:
 - [x] 동적 CPU Y축 — 멀티코어 컨테이너에서 100% 초과 시 자동 확장
 - [x] 볼륨 마운트 표시 — 컨테이너 상세 보기에서 마운트 경로 확인
 - [x] 인터랙티브 exec 셸 — `e` 키로 TUI를 일시 정지하고 컨테이너 셸 접속
+- [x] Disk Usage 패널 — `docker system df` 스타일 breakdown + 카테고리별 프룬 (`d` 키)
+- [x] Container Logs 디스크 사용량 카테고리 — `docker system df`가 못 잡는 로그 파일 용량 노출
 
 ---
 

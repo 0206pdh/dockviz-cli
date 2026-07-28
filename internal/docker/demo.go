@@ -19,6 +19,7 @@ type DemoClient struct {
 	containersPruned bool
 	volumesPruned    bool
 	buildCachePruned bool
+	logsPruned       bool
 }
 
 // NewDemoClient returns a demo client that needs no Docker daemon.
@@ -94,41 +95,6 @@ func (d *DemoClient) ListContainers() ([]ContainerInfo, error) {
 	}, nil
 }
 
-// ListNetworks returns fake network topology data with IPAM metadata.
-func (d *DemoClient) ListNetworks() ([]NetworkInfo, error) {
-	return []NetworkInfo{
-		{
-			ID:     "net001aabbcc",
-			Name:   "app-network",
-			Driver: "bridge",
-			Subnet: "172.20.0.0/16",
-			Containers: []ContainerEndpoint{
-				{Name: "nginx-proxy", IPv4: "172.20.0.2"},
-				{Name: "api-server", IPv4: "172.20.0.3"},
-				{Name: "worker", IPv4: "172.20.0.4"},
-			},
-		},
-		{
-			ID:     "net002bbccdd",
-			Name:   "db-network",
-			Driver: "bridge",
-			Subnet: "172.21.0.0/16",
-			Containers: []ContainerEndpoint{
-				{Name: "api-server", IPv4: "172.21.0.2"},
-				{Name: "postgres-db", IPv4: "172.21.0.3"},
-				{Name: "redis-cache", IPv4: "172.21.0.4"},
-			},
-		},
-		{
-			ID:         "net003ccddef",
-			Name:       "host",
-			Driver:     "host",
-			Subnet:     "",
-			Containers: []ContainerEndpoint{},
-		},
-	}, nil
-}
-
 // ListImages returns fake image data.
 func (d *DemoClient) ListImages() ([]ImageInfo, error) {
 	return []ImageInfo{
@@ -144,24 +110,6 @@ func (d *DemoClient) ListImages() ([]ImageInfo, error) {
 
 // Ping always succeeds in demo mode.
 func (d *DemoClient) Ping() error { return nil }
-
-// StartContainer simulates a start (prints nothing, just delays).
-func (d *DemoClient) StartContainer(id string) error {
-	time.Sleep(300 * time.Millisecond)
-	return nil
-}
-
-// StopContainer simulates a stop.
-func (d *DemoClient) StopContainer(id string) error {
-	time.Sleep(300 * time.Millisecond)
-	return nil
-}
-
-// RestartContainer simulates a restart.
-func (d *DemoClient) RestartContainer(id string) error {
-	time.Sleep(500 * time.Millisecond)
-	return nil
-}
 
 // FetchStats returns animated fake stats (not used — stats are inlined in ListContainers for demo).
 func (d *DemoClient) FetchStats(id string) (float64, float64, error) {
@@ -188,6 +136,7 @@ func (d *DemoClient) DiskUsage() (DiskUsageInfo, error) {
 		Containers: DiskUsageCategory{Label: "Containers", Total: 6, Active: 5, SizeMB: 62, ReclaimMB: 18},
 		Volumes:    DiskUsageCategory{Label: "Local Volumes", Total: 4, Active: 2, SizeMB: 512, ReclaimMB: 96},
 		BuildCache: DiskUsageCategory{Label: "Build Cache", Total: 37, Active: 2, SizeMB: 2870, ReclaimMB: 2560},
+		Logs:       DiskUsageCategory{Label: "Container Logs", Total: 6, Active: 5, SizeMB: 734, ReclaimMB: 734},
 	}
 	if d.imagesPruned {
 		info.Images.Total -= 3
@@ -208,6 +157,12 @@ func (d *DemoClient) DiskUsage() (DiskUsageInfo, error) {
 		info.BuildCache.Total -= 30
 		info.BuildCache.SizeMB -= 2560
 		info.BuildCache.ReclaimMB = 0
+	}
+	if d.logsPruned {
+		info.Logs.Total = 0
+		info.Logs.Active = 0
+		info.Logs.SizeMB = 0
+		info.Logs.ReclaimMB = 0
 	}
 	return info, nil
 }
@@ -238,6 +193,13 @@ func (d *DemoClient) PruneBuildCache() (float64, error) {
 	time.Sleep(400 * time.Millisecond)
 	d.buildCachePruned = true
 	return 2560, nil
+}
+
+// PruneLogs simulates truncating container log files.
+func (d *DemoClient) PruneLogs() (float64, error) {
+	time.Sleep(400 * time.Millisecond)
+	d.logsPruned = true
+	return 734, nil
 }
 
 // StreamLogs simulates a live log stream with pre-canned demo lines.
@@ -334,4 +296,3 @@ func (d *DemoClient) StreamEvents(ctx context.Context) <-chan EventInfo {
 	}()
 	return ch
 }
-

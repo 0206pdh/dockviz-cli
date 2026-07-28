@@ -12,11 +12,9 @@ type KeyMap struct {
 	Back    key.Binding
 	Tab     key.Binding
 	Refresh key.Binding
-	Toggle  key.Binding // start/stop container
 	Logs    key.Binding
 	Delete  key.Binding // force-remove a container
 	Chart   key.Binding // full-screen stats history chart
-	Exec    key.Binding // open interactive shell in container
 	Quit    key.Binding
 }
 
@@ -47,10 +45,6 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh"),
 		),
-		Toggle: key.NewBinding(
-			key.WithKeys("s"),
-			key.WithHelp("s", "start/stop"),
-		),
 		Logs: key.NewBinding(
 			key.WithKeys("l"),
 			key.WithHelp("l", "logs"),
@@ -62,10 +56,6 @@ func DefaultKeyMap() KeyMap {
 		Chart: key.NewBinding(
 			key.WithKeys("g"),
 			key.WithHelp("g", "stats chart"),
-		),
-		Exec: key.NewBinding(
-			key.WithKeys("e"),
-			key.WithHelp("e", "exec shell"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),

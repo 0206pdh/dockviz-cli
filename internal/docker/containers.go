@@ -15,10 +15,10 @@ type ContainerInfo struct {
 	ID      string
 	Name    string
 	Image   string
-	Status  string  // "running", "stopped", "paused", etc.
-	CPUPerc float64 // percentage 0-100
-	MemMB   float64 // megabytes
-	Ports   string  // human-readable port bindings
+	Status  string   // "running", "stopped", "paused", etc.
+	CPUPerc float64  // percentage 0-100
+	MemMB   float64  // megabytes
+	Ports   string   // human-readable port bindings
 	Volumes []string // mount points, e.g. ["/host/path → /ctr/path", "vol → /data:ro"]
 }
 
@@ -79,23 +79,6 @@ func (c *Client) FetchStats(id string) (cpu float64, memMB float64, err error) {
 	cpu = calcCPUPercent(stats)
 	memMB = float64(stats.MemoryStats.Usage) / 1024 / 1024
 	return cpu, memMB, nil
-}
-
-// StartContainer starts a stopped container.
-func (c *Client) StartContainer(id string) error {
-	return c.cli.ContainerStart(c.ctx, id, container.StartOptions{})
-}
-
-// StopContainer stops a running container (10s grace period).
-func (c *Client) StopContainer(id string) error {
-	timeout := 10
-	return c.cli.ContainerStop(c.ctx, id, container.StopOptions{Timeout: &timeout})
-}
-
-// RestartContainer restarts a container.
-func (c *Client) RestartContainer(id string) error {
-	timeout := 10
-	return c.cli.ContainerRestart(c.ctx, id, container.StopOptions{Timeout: &timeout})
 }
 
 // RemoveContainer force-removes a container regardless of its running state.

@@ -9,18 +9,15 @@ import "context"
 // The real Client and DemoClient both satisfy it.
 type DockerClient interface {
 	ListContainers() ([]ContainerInfo, error)
-	ListNetworks() ([]NetworkInfo, error)
 	ListImages() ([]ImageInfo, error)
 	FetchStats(id string) (cpu float64, memMB float64, err error)
-	StartContainer(id string) error
-	StopContainer(id string) error
-	RestartContainer(id string) error
 	// RemoveContainer force-removes a container (running or stopped).
 	RemoveContainer(id string) error
 	// RemoveImage removes a local image by ID or tag.
 	RemoveImage(id string) error
 	// DiskUsage returns a docker-system-df-style breakdown of images,
-	// containers, volumes, and build cache.
+	// containers, volumes, and build cache, plus a Logs category that
+	// `docker system df` itself doesn't account for.
 	DiskUsage() (DiskUsageInfo, error)
 	// PruneImages removes dangling (untagged) images.
 	PruneImages() (freedMB float64, err error)
@@ -30,6 +27,8 @@ type DockerClient interface {
 	PruneVolumes() (freedMB float64, err error)
 	// PruneBuildCache removes unused build cache layers.
 	PruneBuildCache() (freedMB float64, err error)
+	// PruneLogs truncates container log files. Never removes a container.
+	PruneLogs() (freedMB float64, err error)
 	// StreamLogs streams the last 50 lines + live log output for a container.
 	// Cancel the provided context to stop the stream.
 	StreamLogs(ctx context.Context, id string) <-chan LogLine
