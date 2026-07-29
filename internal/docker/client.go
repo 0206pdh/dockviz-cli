@@ -5,20 +5,27 @@ package docker
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/docker/docker/client"
 )
 
 // Client wraps the Docker SDK client with a shared context.
 type Client struct {
-	cli *client.Client
-	ctx context.Context
+	cli        *client.Client
+	ctx        context.Context
+	daemonHost string
 }
 
 // NewClient creates and validates a connection to the Docker daemon.
 // host overrides the DOCKER_HOST environment variable when non-empty
 // (e.g. "tcp://192.168.1.100:2375"). Pass "" to use the env var or default socket.
 func NewClient(host string) (*Client, error) {
+	effectiveHost := host
+	if effectiveHost == "" {
+		effectiveHost = os.Getenv("DOCKER_HOST")
+	}
+
 	opts := []client.Opt{
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
@@ -38,7 +45,7 @@ func NewClient(host string) (*Client, error) {
 		return nil, fmt.Errorf("cannot reach Docker daemon — is Docker running? %w", err)
 	}
 
-	return &Client{cli: cli, ctx: ctx}, nil
+	return &Client{cli: cli, ctx: ctx, daemonHost: effectiveHost}, nil
 }
 
 // Close releases the underlying HTTP connection.

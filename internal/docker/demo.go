@@ -137,6 +137,14 @@ func (d *DemoClient) DiskUsage() (DiskUsageInfo, error) {
 		Volumes:    DiskUsageCategory{Label: "Local Volumes", Total: 4, Active: 2, SizeMB: 512, ReclaimMB: 96},
 		BuildCache: DiskUsageCategory{Label: "Build Cache", Total: 37, Active: 2, SizeMB: 2870, ReclaimMB: 2560},
 		Logs:       DiskUsageCategory{Label: "Container Logs", Total: 6, Active: 5, SizeMB: 734, ReclaimMB: 734},
+		HostStorage: HostStorageInfo{
+			Label:       "Docker Desktop VHDX",
+			Kind:        "Docker Desktop WSL2 virtual disk",
+			Path:        `C:\Users\demo\AppData\Local\Docker\wsl\disk\docker_data.vhdx`,
+			AllocatedMB: 19460,
+			HostFreeMB:  28030,
+			Available:   true,
+		},
 	}
 	if d.imagesPruned {
 		info.Images.Total -= 3

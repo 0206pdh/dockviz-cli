@@ -50,6 +50,37 @@ func TestBytesToMB(t *testing.T) {
 	}
 }
 
+func TestLocalDockerHost(t *testing.T) {
+	tests := []struct {
+		host string
+		want bool
+	}{
+		{"", true},
+		{"npipe:////./pipe/docker_engine", true},
+		{"unix:///var/run/docker.sock", true},
+		{"tcp://localhost:2375", true},
+		{"tcp://127.0.0.1:2375", true},
+		{"tcp://192.168.1.100:2375", false},
+		{"ssh://docker@example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			if got := localDockerHost(tt.host); got != tt.want {
+				t.Errorf("localDockerHost(%q) = %v, want %v", tt.host, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDockerDesktopVHDXPaths(t *testing.T) {
+	paths := dockerDesktopVHDXPaths(`C:\Users\me\AppData\Local`, `C:\Users\me`)
+	want := `C:\Users\me\AppData\Local\Docker\wsl\disk\docker_data.vhdx`
+	if len(paths) == 0 || paths[0] != want {
+		t.Fatalf("dockerDesktopVHDXPaths()[0] = %q, want %q", paths[0], want)
+	}
+}
+
 func TestFormatSizeZeroAndSmallValues(t *testing.T) {
 	tests := []struct {
 		name string

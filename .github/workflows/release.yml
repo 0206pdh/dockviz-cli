@@ -2,8 +2,6 @@
 #
 # Triggers on:
 #   - push of a version tag (e.g. v1.2.3)               → release exactly that version
-#   - push to main (e.g. a merged PR)                    → auto-bump the patch version,
-#                                                            tag it, and release that
 #
 # Artifacts produced:
 #   dockviz-linux-amd64
@@ -15,8 +13,6 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"   # trigger on any tag that looks like a version
 
@@ -25,7 +21,7 @@ jobs:
     name: Determine Release Version
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to push the auto-bumped tag on a main-branch push
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -37,29 +33,7 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # Triggered by a push to main: auto-bump the patch version from the
-          # latest existing tag (v0.4.6 -> v0.4.7). Falls back to v0.0.1 if no
-          # tag exists yet.
-          latest=$(git tag --list 'v*' --sort=-v:refname | head -n1)
-          if [ -z "$latest" ]; then
-            latest="v0.0.0"
-          fi
-          IFS='.' read -r major minor patch <<< "${latest#v}"
-          next="v${major}.${minor}.$((patch + 1))"
-          echo "version=$next" >> "$GITHUB_OUTPUT"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$next" -m "$next — auto release from $(git rev-parse --short HEAD)"
-          # Pushed with GITHUB_TOKEN: intentionally does NOT re-trigger this
-          # workflow (GitHub Actions doesn't cascade off its own token), so
-          # this run continues on to build/release $next without a duplicate run.
-          git push origin "$next"
+          echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
@@ -314,8 +288,6 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # Explicit tag: on a main-branch push the triggering ref is
-          # refs/heads/main, not the tag determine_version just pushed.
           tag_name: ${{ needs.determine_version.outputs.version }}
           # Attach every binary found under dist/.
           files: dist/**/*

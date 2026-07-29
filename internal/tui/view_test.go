@@ -10,6 +10,7 @@ import (
 
 func TestRenderDiskUsageDistinguishesZeroUnknownAndOutsidePrune(t *testing.T) {
 	m := Model{
+		activePanel:     PanelDiskUsage,
 		diskUsageLoaded: true,
 		diskUsage: docker.DiskUsageInfo{
 			Images: docker.DiskUsageCategory{
@@ -47,5 +48,52 @@ func TestDiskUsageRefreshErrorStaysInPanel(t *testing.T) {
 	}
 	if !strings.Contains(got.renderDiskUsage(), "daemon unavailable") {
 		t.Fatal("renderDiskUsage() did not show the refresh error")
+	}
+}
+
+func TestRenderDiskUsageShowsHostStorageSeparately(t *testing.T) {
+	m := Model{
+		activePanel:     PanelDiskUsage,
+		diskUsageLoaded: true,
+		diskUsage: docker.DiskUsageInfo{
+			Images: docker.DiskUsageCategory{SizeMB: 460},
+			HostStorage: docker.HostStorageInfo{
+				Label:       "Docker Desktop VHDX",
+				Path:        `C:\Users\me\AppData\Local\Docker\wsl\disk\docker_data.vhdx`,
+				AllocatedMB: 19920,
+				HostFreeMB:  28030,
+				Available:   true,
+			},
+		},
+	}
+
+	view := m.renderDiskUsage()
+	for _, want := range []string{"HOST STORAGE", "Docker Desktop VHDX", "19.5 GB", "host free 27.4 GB", "outside Docker df: 19.0 GB", "VHDX compaction"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("renderDiskUsage() missing %q in:\n%s", want, view)
+		}
+	}
+
+	if got := m.activeListLen(); got != 5 {
+		t.Fatalf("activeListLen() = %d, want 5 prunable rows only", got)
+	}
+}
+
+func TestHostStorageOutsideDockerDF(t *testing.T) {
+	du := docker.DiskUsageInfo{
+		Images:     docker.DiskUsageCategory{SizeMB: 100},
+		Containers: docker.DiskUsageCategory{SizeMB: 50},
+		HostStorage: docker.HostStorageInfo{
+			AllocatedMB: 200,
+			Available:   true,
+		},
+	}
+	if got := hostStorageOutsideDockerDF(du); got != 50 {
+		t.Fatalf("hostStorageOutsideDockerDF() = %v, want 50", got)
+	}
+
+	du.HostStorage.AllocatedMB = 100
+	if got := hostStorageOutsideDockerDF(du); got != 0 {
+		t.Fatalf("hostStorageOutsideDockerDF() = %v, want 0 when Docker df accounts for more than host allocation", got)
 	}
 }

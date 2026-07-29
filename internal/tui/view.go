@@ -469,6 +469,11 @@ func (m Model) renderDiskUsage() string {
 		}
 	}
 
+	if hostRows := renderHostStorage(m.diskUsage); len(hostRows) > 0 {
+		rows = append(rows, "")
+		rows = append(rows, hostRows...)
+	}
+
 	switch {
 	case m.diskUsageErr != nil:
 		rows = append(rows, "\n  "+ui.ErrorStyle.Render("⚠ Disk Usage refresh failed: "+m.diskUsageErr.Error()))
@@ -481,6 +486,57 @@ func (m Model) renderDiskUsage() string {
 	}
 
 	return strings.Join(rows, "\n")
+}
+
+func renderHostStorage(du docker.DiskUsageInfo) []string {
+	info := du.HostStorage
+	if info.Label == "" {
+		return nil
+	}
+
+	rows := []string{
+		ui.HeaderStyle.Render("  HOST STORAGE"),
+	}
+	if !info.Available {
+		if info.Unavailable == "" {
+			return nil
+		}
+		rows = append(rows, fmt.Sprintf("  %-22s %-10s", info.Label, "N/A"))
+		rows = append(rows, "  "+lipgloss.NewStyle().Foreground(ui.ColorGray).Render(info.Unavailable))
+		return rows
+	}
+
+	rows = append(rows, fmt.Sprintf("  %-22s %-10s host free %-10s",
+		info.Label,
+		docker.FormatSize(info.AllocatedMB),
+		docker.FormatSize(info.HostFreeMB),
+	))
+	if outsideDockerDF := hostStorageOutsideDockerDF(du); outsideDockerDF > 0 {
+		rows = append(rows, "  "+lipgloss.NewStyle().Foreground(ui.ColorGray).Render(
+			fmt.Sprintf("outside Docker df: %s (not a prune estimate)", docker.FormatSize(outsideDockerDF))))
+	}
+	if info.Path != "" {
+		rows = append(rows, "  "+lipgloss.NewStyle().Foreground(ui.ColorGray).Render(info.Path))
+	}
+	rows = append(rows, "  "+lipgloss.NewStyle().Foreground(ui.ColorGray).Render(
+		"docker prune frees Docker objects; VHDX compaction returns this allocation to Windows"))
+	return rows
+}
+
+func hostStorageOutsideDockerDF(du docker.DiskUsageInfo) float64 {
+	if !du.HostStorage.Available {
+		return 0
+	}
+	accounted := du.Images.SizeMB +
+		du.Containers.SizeMB +
+		du.Volumes.SizeMB +
+		du.BuildCache.SizeMB +
+		du.Logs.SizeMB
+	outside := du.HostStorage.AllocatedMB - accounted
+	if outside <= 0 {
+		return 0
+	}
+	return outside
 }
 
 // renderEvents shows a live-updating timeline of Docker container lifecycle events.

@@ -101,7 +101,7 @@ Docker event를 내부적으로 수집하지만 정상적인 `create`, `start` �
 ## Disk Usage 패널
 
 Docker `system/df` API를 기반으로 하며, `docker system df`에 없는
-Container Logs 카테고리를 추가합니다.
+저장공간 신호도 함께 보여줍니다.
 
 | 카테고리 | 동작 |
 |---|---|
@@ -111,9 +111,23 @@ Container Logs 카테고리를 추가합니다.
 | Build Cache | 사용되지 않는 build cache layer 삭제 |
 | Container Logs | 활성 로그 truncate 및 rotated 로그 삭제 |
 
+Windows Docker Desktop의 WSL2 백엔드에서는 로컬에서 측정 가능한 경우
+`docker_data.vhdx`를 읽기 전용 Host Storage 섹션으로 표시합니다. 이 값은
+prune 표와 의도적으로 분리되어 있습니다. Docker prune은 daemon 내부 객체를
+삭제하지만, VHDX 파일은 Docker Desktop/WSL compaction 전까지 Windows에서
+계속 크게 보일 수 있습니다.
+
+가능한 경우 dockviz는 VHDX 할당량 중 Docker `system/df`가 설명하지 못하는
+차이도 표시합니다. 이 값은 진단용 gap이며 prune 예상 회수량이 아닙니다.
+
 행을 선택하고 `d`를 누르면 확인창이 표시됩니다. 로그 정리는 정확한 파일
 크기를 제공하는 portable Docker API가 없기 때문에 로컬 파일시스템 작업으로
 수행됩니다.
+
+큰 Host Storage VHDX 값을 Docker reclaimable 용량으로 해석하면 안 됩니다.
+이 값은 host-side 가상 디스크 할당량이며, Docker Desktop VM 내부에서는 이미
+비어 있어 재사용 가능한 공간이지만 Windows가 아직 회수하지 않은 공간일 수
+있습니다.
 
 Container Logs의 정확한 측정에는 daemon과 dockviz의 파일시스템 공유 및
 로그 디렉터리 접근 권한이 필요합니다. Docker Desktop이나 원격
@@ -174,8 +188,10 @@ daemon 없이도 TUI와 판정 로직을 테스트할 수 있습니다.
 
 ## Release
 
-Release 자동화는 `.github/workflows/release.yml`에 있습니다. version 주입
-빌드는 `go build -ldflags="-X main.version=v1.2.3" -o dockviz .`로 합니다.
+Release 자동화는 `.github/workflows/release.yml`에 있습니다. `v1.2.3` 같은
+version tag를 push했을 때만 release가 생성됩니다. 일반 `main` push는 release나
+patch tag를 자동 생성하지 않습니다. version 주입 빌드는
+`go build -ldflags="-X main.version=v1.2.3" -o dockviz .`로 합니다.
 `ldflags` 없는 로컬 빌드의 버전은 `dev`입니다.
 
 ## 정량 성능 시나리오

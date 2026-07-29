@@ -181,8 +181,8 @@ classification focuses on the recent ten-minute window.
 
 ## Disk Usage panel
 
-The panel uses Docker's `system/df` API and adds a Container Logs category that
-Docker's own `docker system df` does not report.
+The panel uses Docker's `system/df` API and adds storage signals that Docker's
+own `docker system df` does not report.
 
 | Category | Current action |
 |---|---|
@@ -191,6 +191,16 @@ Docker's own `docker system df` does not report.
 | Local Volumes | Removes unattached local volumes; review carefully because data can be deleted |
 | Build Cache | Removes unused build-cache layers |
 | Container Logs | Truncates active log files and removes rotated siblings |
+
+On Windows Docker Desktop with the WSL2 backend, the panel also shows a
+read-only Host Storage section for `docker_data.vhdx` when it can be measured
+locally. This is intentionally separate from the prune table: Docker prune
+removes daemon-level objects, but the VHDX file can remain expanded until Docker
+Desktop/WSL compaction returns that allocation to Windows.
+
+When available, dockviz also shows the part of the VHDX allocation that is
+outside Docker's `system/df` accounting. That number is a diagnostic gap, not a
+prune estimate.
 
 Select a row and press `d` to open the confirmation dialog. The operation is
 performed through Docker's API for the first four categories. Container log
@@ -203,6 +213,10 @@ bytes. `N/A` means the daemon returned a resource whose size or log path could
 not be measured. Tagged images that are unused but outside the safe
 dangling-image prune are shown as a separate note instead of being silently
 counted as reclaimable.
+
+Do not read a large Host Storage VHDX value as Docker reclaimable space. It is
+the host-side virtual disk allocation, which may include free space inside the
+Docker Desktop VM that Docker can reuse but Windows has not reclaimed yet.
 
 ### Container Logs limitations
 
@@ -283,7 +297,9 @@ depend on the environment.
 ## Release
 
 Release automation lives in `.github/workflows/release.yml`. A release build
-injects the version with:
+is created only when a version tag such as `v1.2.3` is pushed. Ordinary pushes
+to `main` do not create releases or auto-bump patch tags. The build injects the
+version with:
 
 ```bash
 go build -ldflags="-X main.version=v1.2.3" -o dockviz .

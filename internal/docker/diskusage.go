@@ -46,6 +46,10 @@ type DiskUsageInfo struct {
 	// so an unrotated json-file log is a common source of disk usage that
 	// stays invisible until the disk fills up.
 	Logs DiskUsageCategory
+	// HostStorage describes Docker Desktop's host-side virtual disk when it
+	// can be measured locally. It is informational only; docker prune actions
+	// do not shrink this file.
+	HostStorage HostStorageInfo
 }
 
 // DiskUsage fetches and summarizes Docker's disk usage, mirroring `docker system df`
@@ -160,6 +164,7 @@ func (c *Client) DiskUsage() (DiskUsageInfo, error) {
 		info.Logs.Unavailable = fmt.Sprintf("log path unavailable for %d container(s) — Docker Desktop/remote daemon paths are not local", unknownLogCount)
 	}
 
+	info.HostStorage = detectDockerDesktopHostStorage(c.daemonHost)
 	return info, nil
 }
 
