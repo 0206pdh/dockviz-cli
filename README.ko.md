@@ -178,6 +178,29 @@ Release 자동화는 `.github/workflows/release.yml`에 있습니다. version �
 빌드는 `go build -ldflags="-X main.version=v1.2.3" -o dockviz .`로 합니다.
 `ldflags` 없는 로컬 빌드의 버전은 `dev`입니다.
 
+## 정량 성능 시나리오
+
+실제 Docker daemon 연결과 Containers, Problems, Disk Usage 패널을 숫자로
+검증하려면 [`scenarios/run-dockviz-performance.ps1`](scenarios/run-dockviz-performance.ps1)을
+실행한다. CPU, 메모리, 로그 폭증, 재시작 루프와 max-safe 저장소 부하를 만들고
+CSV/JSON 결과를 `artifacts`에 저장한 뒤 테스트 컨테이너와 라벨된 volume을 자동으로 정리한다.
+노트북의 여유 공간을 크게 사용하는 검증은 `-UseMaxSafeStorage`를 사용할 수
+있으며, 기본 12 GiB를 남기고 나머지를 payload로 사용한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scenarios\run-dockviz-performance.ps1 `
+  -RunLabel max-safe `
+  -UseMaxSafeStorage `
+  -StorageReserveGB 12 `
+  -DurationSeconds 20 `
+  -StorageReadyTimeoutSeconds 1800
+```
+
+자세한 설명은
+[`docs/performance-scenarios.ko.md`](docs/performance-scenarios.ko.md)를 참고한다.
+실제 daemon에서 실행한 검증 결과는
+[`docs/performance-results.ko.md`](docs/performance-results.ko.md)에 정리되어 있다.
+
 ## License
 
 MIT © 2026 [0206pdh](https://github.com/0206pdh)

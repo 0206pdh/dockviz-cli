@@ -136,6 +136,34 @@ dockviz --version
 The default path calls Docker `Ping()` before starting the TUI. `--demo` is
 the only mode that avoids a live daemon.
 
+## Quantitative scenario test
+
+To verify the live daemon path with reproducible load, run the scenario
+harness in [`scenarios/run-dockviz-performance.ps1`](scenarios/run-dockviz-performance.ps1).
+It creates CPU, memory, log, restart-loop, and storage-pressure workloads, writes CSV/JSON
+measurements, and removes only those test containers and the labelled test volume when it finishes. Keep
+dockviz open in another terminal while the scenario runs to correlate the
+numbers with the Containers, Problems, and Disk Usage panels.
+
+For a larger disk-pressure test, use `-UseMaxSafeStorage`; it reserves 12 GiB
+by default and uses the remaining workspace-drive capacity for the payload.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scenarios\run-dockviz-performance.ps1 `
+  -RunLabel max-safe `
+  -UseMaxSafeStorage `
+  -StorageReserveGB 12 `
+  -DurationSeconds 20 `
+  -StorageReadyTimeoutSeconds 1800
+```
+
+For application-level Docker resource comparison, pass the same fixed
+workload command with `-TargetImage` and `-TargetCommand` in both runs.
+The full Korean guide is in
+[`docs/performance-scenarios.ko.md`](docs/performance-scenarios.ko.md).
+An example daemon measurement is recorded in
+[`docs/performance-results.ko.md`](docs/performance-results.ko.md).
+
 ## Problems panel
 
 The Problems panel keeps the Docker event stream internally but hides normal
