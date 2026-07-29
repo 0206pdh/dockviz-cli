@@ -50,6 +50,25 @@ func TestBytesToMB(t *testing.T) {
 	}
 }
 
+func TestFormatSizeZeroAndSmallValues(t *testing.T) {
+	tests := []struct {
+		name string
+		mb   float64
+		want string
+	}{
+		{"zero is explicit", 0, "0B"},
+		{"small value is not rounded away", 0.5, "512 KB"},
+		{"megabyte value", 1, "1 MB"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FormatSize(tt.mb); got != tt.want {
+				t.Errorf("FormatSize(%v) = %q, want %q", tt.mb, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLogFileSizes(t *testing.T) {
 	t.Run("empty path", func(t *testing.T) {
 		active, rotated, denied := logFileSizes("")
@@ -116,8 +135,8 @@ func TestLogFileSizes(t *testing.T) {
 
 	t.Run("nonexistent log path", func(t *testing.T) {
 		active, rotated, denied := logFileSizes(filepath.Join(t.TempDir(), "missing-json.log"))
-		if active != 0 || len(rotated) != 0 || denied {
-			t.Errorf("logFileSizes(missing) = (%v, %v, %v), want (0, empty, false)", active, rotated, denied)
+		if active != 0 || len(rotated) != 0 || !denied {
+			t.Errorf("logFileSizes(missing) = (%v, %v, %v), want (0, empty, true)", active, rotated, denied)
 		}
 	})
 }

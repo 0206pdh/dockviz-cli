@@ -197,6 +197,13 @@ performed through Docker's API for the first four categories. Container log
 cleanup is a local filesystem operation because Docker has no portable API for
 the exact on-disk log-file size.
 
+The panel refreshes automatically every 10 seconds while it is visible; press
+`r` for an immediate refresh. `0B` means Docker measured zero reclaimable
+bytes. `N/A` means the daemon returned a resource whose size or log path could
+not be measured. Tagged images that are unused but outside the safe
+dangling-image prune are shown as a separate note instead of being silently
+counted as reclaimable.
+
 ### Container Logs limitations
 
 Exact log size requires dockviz and the daemon to share a filesystem and for

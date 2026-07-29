@@ -22,6 +22,13 @@ type DiskUsageCategory struct {
 	Active    int     // objects currently in use
 	SizeMB    float64 // total size on disk
 	ReclaimMB float64 // size Prune would free for this category
+	// Unknown is the number of objects whose size or reclaimability could not
+	// be measured. It is deliberately separate from zero: zero means the
+	// daemon measured no bytes, while Unknown means the answer is unavailable.
+	Unknown int
+	// OutsidePruneMB is known unused space that the selected safe prune action
+	// intentionally does not remove. It is currently used for tagged images.
+	OutsidePruneMB float64
 	// Unavailable, when non-empty, explains why this category couldn't be
 	// fully measured (e.g. filesystem permission denied) so the TUI can
 	// show that instead of a misleadingly clean 0.
@@ -60,6 +67,11 @@ func (c *Client) DiskUsage() (DiskUsageInfo, error) {
 		}
 		if isDangling(img) {
 			info.Images.ReclaimMB += bytesToMB(img.Size)
+		} else if img.Containers == 0 {
+			// The selected prune action is intentionally dangling-only. Keep
+			// tagged images outside that action, but tell the operator that the
+			// space is unused and can be removed from the Images panel.
+			info.Images.OutsidePruneMB += bytesToMB(img.Size)
 		}
 	}
 
@@ -77,19 +89,26 @@ func (c *Client) DiskUsage() (DiskUsageInfo, error) {
 	}
 
 	info.Volumes.Label = "Local Volumes"
+	unknownVolumeCount := 0
 	for _, v := range du.Volumes {
 		info.Volumes.Total++
 		var size, refCount int64
-		if v.UsageData != nil {
-			size = v.UsageData.Size
-			refCount = v.UsageData.RefCount
+		if v.UsageData == nil {
+			unknownVolumeCount++
+			continue
 		}
+		size = v.UsageData.Size
+		refCount = v.UsageData.RefCount
 		info.Volumes.SizeMB += bytesToMB(size)
 		if refCount > 0 {
 			info.Volumes.Active++
 		} else {
 			info.Volumes.ReclaimMB += bytesToMB(size)
 		}
+	}
+	if unknownVolumeCount > 0 {
+		info.Volumes.Unknown = unknownVolumeCount
+		info.Volumes.Unavailable = fmt.Sprintf("size unavailable for %d volume(s) — daemon returned no UsageData", unknownVolumeCount)
 	}
 
 	info.BuildCache.Label = "Build Cache"
@@ -104,15 +123,16 @@ func (c *Client) DiskUsage() (DiskUsageInfo, error) {
 	}
 
 	info.Logs.Label = "Container Logs"
-	deniedCount := 0
+	unknownLogCount := 0
 	for _, ctr := range du.Containers {
 		inspect, err := c.cli.ContainerInspect(c.ctx, ctr.ID)
 		if err != nil {
+			unknownLogCount++
 			continue
 		}
-		activeMB, rotated, denied := logFileSizes(inspect.LogPath)
-		if denied {
-			deniedCount++
+		activeMB, rotated, unavailable := logFileSizes(inspect.LogPath)
+		if unavailable {
+			unknownLogCount++
 			continue
 		}
 		size := activeMB
@@ -135,8 +155,9 @@ func (c *Client) DiskUsage() (DiskUsageInfo, error) {
 	// install; a `docker`-group user can talk to the daemon but can't read
 	// those files directly. Say so explicitly instead of showing a clean 0,
 	// which would look identical to "this container just has no logs".
-	if deniedCount > 0 {
-		info.Logs.Unavailable = fmt.Sprintf("permission denied on %d container(s) — try sudo", deniedCount)
+	if unknownLogCount > 0 {
+		info.Logs.Unknown = unknownLogCount
+		info.Logs.Unavailable = fmt.Sprintf("log path unavailable for %d container(s) — Docker Desktop/remote daemon paths are not local", unknownLogCount)
 	}
 
 	return info, nil
@@ -199,22 +220,39 @@ func (c *Client) PruneLogs() (float64, error) {
 	}
 
 	var freedMB float64
+	unavailable := 0
+	failed := 0
 	for _, ctr := range du.Containers {
 		inspect, err := c.cli.ContainerInspect(c.ctx, ctr.ID)
 		if err != nil {
+			unavailable++
 			continue
 		}
-		activeMB, rotated, _ := logFileSizes(inspect.LogPath)
+		activeMB, rotated, pathUnavailable := logFileSizes(inspect.LogPath)
+		if pathUnavailable {
+			unavailable++
+			continue
+		}
 		if inspect.LogPath != "" && activeMB > 0 {
 			if err := os.Truncate(inspect.LogPath, 0); err == nil {
 				freedMB += activeMB
+			} else {
+				failed++
 			}
 		}
 		for path, size := range rotated {
 			if err := os.Remove(path); err == nil {
 				freedMB += size
+			} else {
+				failed++
 			}
 		}
+	}
+	if unavailable > 0 {
+		return freedMB, fmt.Errorf("container log paths unavailable for %d container(s); Docker Desktop or remote daemon logs must be cleaned on the daemon host", unavailable)
+	}
+	if failed > 0 {
+		return freedMB, fmt.Errorf("failed to remove or truncate %d container log file(s)", failed)
 	}
 	return freedMB, nil
 }
@@ -250,14 +288,10 @@ func fileSizeMB(path string) float64 {
 // be reclaimed differently: the active file is truncated in place while
 // rotated files are removed outright (see PruneLogs).
 //
-// permDenied reports whether the active log path exists but this process
-// lacks permission to read it. It's checked with a direct Stat on logPath
-// rather than inferred from the Glob results below: Glob silently returns
-// no matches (not an error) when it can't list the containing directory, so
-// relying on it would make "permission denied" indistinguishable from
-// "no log file". permDenied is left false for any other reason the log is
-// unreachable (no logPath, or it doesn't exist) since there's nothing
-// actionable to tell the user in those cases.
+// unavailable reports whether the active log path is not reachable from this
+// process. Docker Desktop and remote daemons commonly return a path that only
+// exists inside the daemon's VM/host, so treating an os.Stat failure as 0B
+// would hide real log usage.
 func logFileSizes(logPath string) (activeMB float64, rotatedMB map[string]float64, permDenied bool) {
 	rotatedMB = map[string]float64{}
 	if logPath == "" {
@@ -265,11 +299,11 @@ func logFileSizes(logPath string) (activeMB float64, rotatedMB map[string]float6
 	}
 
 	fi, err := os.Stat(logPath)
-	if os.IsPermission(err) {
-		return 0, rotatedMB, true
-	}
 	if err != nil {
-		return 0, rotatedMB, false
+		// A non-empty LogPath that cannot be stat'ed is not evidence of a
+		// zero-byte log. It is usually a Docker Desktop VM or remote-daemon
+		// path that this process cannot reach.
+		return 0, rotatedMB, true
 	}
 	activeMB = bytesToMB(fi.Size())
 

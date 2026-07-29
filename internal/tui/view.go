@@ -442,13 +442,20 @@ func (m Model) renderDiskUsage() string {
 		if i == m.cursor {
 			cursor = "▶ "
 		}
-		reclaim := "-"
-		if r.cat.ReclaimMB > 0 {
-			reclaim = docker.FormatSize(r.cat.ReclaimMB)
+		size := docker.FormatSize(r.cat.SizeMB)
+		reclaim := docker.FormatSize(r.cat.ReclaimMB)
+		if r.cat.Unknown > 0 {
+			if r.cat.Total <= r.cat.Unknown {
+				size = "N/A"
+				reclaim = "N/A"
+			} else {
+				size += " + ?"
+				reclaim += " + ?"
+			}
 		}
 		row := fmt.Sprintf("%s%-16s %-7d %-7d %-10s %-12s",
 			cursor, r.label, r.cat.Total, r.cat.Active,
-			docker.FormatSize(r.cat.SizeMB), reclaim)
+			size, reclaim)
 		if i == m.cursor {
 			row = ui.SelectedRowStyle.Render(row)
 		}
@@ -456,9 +463,15 @@ func (m Model) renderDiskUsage() string {
 		if r.cat.Unavailable != "" {
 			rows = append(rows, "  "+ui.ErrorStyle.Render("⚠ "+r.cat.Unavailable))
 		}
+		if r.cat.OutsidePruneMB > 0 {
+			rows = append(rows, "  "+lipgloss.NewStyle().Foreground(ui.ColorGray).Render(
+				fmt.Sprintf("unused tagged space outside selected prune: %s", docker.FormatSize(r.cat.OutsidePruneMB))))
+		}
 	}
 
 	switch {
+	case m.diskUsageErr != nil:
+		rows = append(rows, "\n  "+ui.ErrorStyle.Render("⚠ Disk Usage refresh failed: "+m.diskUsageErr.Error()))
 	case !m.diskUsageLoaded:
 		rows = append(rows, "\n  "+lipgloss.NewStyle().Foreground(ui.ColorGray).Render("Loading disk usage..."))
 	case m.pruning:
@@ -669,7 +682,7 @@ func (m Model) renderFooter() string {
 	case PanelProblems:
 		line2 = "● live streaming  ·  events appear as they happen"
 	case PanelDiskUsage:
-		line2 = "[d] Prune selected category  ·  RECLAIMABLE = what pruning that row frees"
+		line2 = "[d] Prune selected category  ·  0B = measured zero  ·  N/A = unavailable"
 	}
 	if m.activePanel == PanelContainers {
 		line2 = "[Enter] Detail  [d] Delete  [l] Logs  [g] Chart"
@@ -737,14 +750,17 @@ func (m Model) renderChart() string {
 // renderChartSection renders a labelled bar chart for a single metric (CPU or Memory).
 //
 // Layout per row:
-//   "  %7s ┤ " (12 chars) + chartW bar chars
+//
+//	"  %7s ┤ " (12 chars) + chartW bar chars
 //
 // Y-axis: even rows + bottom row labelled with their upper boundary value.
-//   For CPU, the row containing 80% is relabelled in red and the row
-//   containing 50% is relabelled in yellow so danger thresholds are clear.
+//
+//	For CPU, the row containing 80% is relabelled in red and the row
+//	containing 50% is relabelled in yellow so danger thresholds are clear.
 //
 // Threshold lines: empty cells in the 80% and 50% CPU rows show a
-//   coloured dot so the boundary is visible even when bars are low.
+//
+//	coloured dot so the boundary is visible even when bars are low.
 //
 // X-axis: a "└──… now" line followed by a time-elapsed label.
 func renderChartSection(label, unit string, values []float64, maxVal float64, chartW, chartH int) string {

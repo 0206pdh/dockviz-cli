@@ -39,6 +39,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		return m, tea.Batch(fetchDataCmd(m.docker), tickCmd())
 
+	case diskUsageRefreshMsg:
+		if m.activePanel != PanelDiskUsage {
+			return m, nil
+		}
+		return m, tea.Batch(fetchDiskUsageCmd(m.docker), diskUsageRefreshCmd())
+
 	// Fresh Docker data arrived
 	case dataMsg:
 		m.loading = false
@@ -107,12 +113,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Interactive exec process returned — resume TUI on the dashboard.
 	// Disk usage breakdown arrived
 	case diskUsageMsg:
-		m.diskUsageLoaded = true
 		if msg.err != nil {
-			m.err = msg.err
+			m.diskUsageErr = msg.err
 			return m, nil
 		}
-		m.err = nil
+		m.diskUsageLoaded = true
+		m.diskUsageErr = nil
 		m.diskUsage = msg.info
 		return m, nil
 
@@ -120,8 +126,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pruneDoneMsg:
 		m.pruning = false
 		if msg.err != nil {
-			m.err = msg.err
-			return m, nil
+			m.diskUsageErr = msg.err
+			return m, fetchDiskUsageCmd(m.docker)
 		}
 		m.pruneResultMsg = fmt.Sprintf("%s: freed %s", categoryLabel(msg.category), docker.FormatSize(msg.freedMB))
 		return m, fetchDiskUsageCmd(m.docker)
@@ -263,7 +269,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Event streaming is started in newModel/Init, so no lazy-start needed here.
 		if m.activePanel == PanelDiskUsage {
 			m.pruneResultMsg = ""
-			return m, fetchDiskUsageCmd(m.docker)
+			m.diskUsageErr = nil
+			return m, tea.Batch(fetchDiskUsageCmd(m.docker), diskUsageRefreshCmd())
 		}
 
 	case keyMatches(msg, km.Refresh):
@@ -311,7 +318,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activePanel == PanelDiskUsage && m.diskUsageLoaded {
 			rows := diskUsageRows(m.diskUsage)
 			if m.cursor < len(rows) {
-				m.pendingDeleteID = rows[m.cursor].key
+				row := rows[m.cursor]
+				if row.cat.Unknown > 0 || row.cat.ReclaimMB <= 0 {
+					m.diskUsageErr = fmt.Errorf("%s has no measured reclaimable bytes", row.label)
+					return m, nil
+				}
+				m.pendingDeleteID = row.key
 				m.confirmDelete = true
 			}
 		}

@@ -52,8 +52,14 @@ func (c *Client) RemoveImage(id string) error {
 	return err
 }
 
-// FormatSize returns a human-readable size string (MB or GB).
+// FormatSize returns a human-readable size string.
 func FormatSize(mb float64) string {
+	if mb <= 0 {
+		return "0B"
+	}
+	if mb < 1 {
+		return fmt.Sprintf("%.0f KB", mb*1024)
+	}
 	if mb >= 1024 {
 		return fmt.Sprintf("%.1f GB", mb/1024)
 	}

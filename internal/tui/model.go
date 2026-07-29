@@ -62,6 +62,11 @@ type diskUsageMsg struct {
 	err  error
 }
 
+// diskUsageRefreshMsg refreshes the relatively expensive system/df query
+// while the Disk Usage panel is visible. It is intentionally slower than the
+// 2-second container stats refresh.
+type diskUsageRefreshMsg struct{}
+
 // pruneDoneMsg is sent after a prune action (images/containers/volumes/build
 // cache) completes.
 type pruneDoneMsg struct {
@@ -88,6 +93,7 @@ type Model struct {
 	// Disk usage panel state
 	diskUsage       docker.DiskUsageInfo
 	diskUsageLoaded bool   // true once the first DiskUsage() fetch has returned
+	diskUsageErr    error  // last DiskUsage refresh error; does not blank the dashboard
 	pruning         bool   // true while a prune action is in flight
 	pruneResultMsg  string // transient "freed N MB" message shown after a prune completes
 
@@ -150,18 +156,18 @@ func newModel(dc docker.DockerClient, version string, demo bool) Model {
 	eventCh := dc.StreamEvents(eventCtx)
 
 	return Model{
-		version:         version,
-		demo:            demo,
-		docker:          dc,
-		activePanel:     PanelContainers,
-		activeView:      ViewDashboard,
-		keys:            DefaultKeyMap(),
-		spinner:         sp,
-		loading:         true,
-		history:         make(map[string][]float64),
-		memHistory:      make(map[string][]float64),
-		eventCh:         eventCh,
-		eventCancel:     eventCancel,
+		version:     version,
+		demo:        demo,
+		docker:      dc,
+		activePanel: PanelContainers,
+		activeView:  ViewDashboard,
+		keys:        DefaultKeyMap(),
+		spinner:     sp,
+		loading:     true,
+		history:     make(map[string][]float64),
+		memHistory:  make(map[string][]float64),
+		eventCh:     eventCh,
+		eventCancel: eventCancel,
 	}
 }
 
@@ -169,6 +175,12 @@ func newModel(dc docker.DockerClient, version string, demo bool) Model {
 func tickCmd() tea.Cmd {
 	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
+	})
+}
+
+func diskUsageRefreshCmd() tea.Cmd {
+	return tea.Tick(10*time.Second, func(time.Time) tea.Msg {
+		return diskUsageRefreshMsg{}
 	})
 }
 
