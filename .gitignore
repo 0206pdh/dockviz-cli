@@ -1,9 +1,10 @@
 # Build output
-dockviz
-dockviz.exe
-dockviz-*
+/dockviz
+/dockviz.exe
+/dockviz-*
 build/
 dist/
+artifacts/
 *.egg-info/
 __pycache__/
 .pytest_cache/

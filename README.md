@@ -50,6 +50,24 @@ The dashboard has four panels:
 The former Networks, Events timeline, `exec`, container lifecycle controls, and
 image pull-progress screens are intentionally outside the current product scope.
 
+## Screenshots
+
+| Containers | Images |
+|---|---|
+| ![Containers panel](docs/images/dockviz-containers.svg) | ![Images panel](docs/images/dockviz-images.svg) |
+
+| Problems | Disk Usage |
+|---|---|
+| ![Problems panel](docs/images/dockviz-problems.svg) | ![Disk Usage panel](docs/images/dockviz-disk-usage.svg) |
+
+Disk cleanup actions are confirmation-gated. Build cache cleanup removes only
+unused build-cache layers, while volume cleanup warns explicitly because unused
+volumes can still contain important application data.
+
+| Build Cache confirmation | Local Volumes confirmation |
+|---|---|
+| ![Build Cache prune confirmation](docs/images/dockviz-confirm-build-cache.svg) | ![Local Volumes prune confirmation](docs/images/dockviz-confirm-volumes.svg) |
+
 ## Installation
 
 ### PyPI
@@ -163,6 +181,9 @@ The full Korean guide is in
 [`docs/performance-scenarios.ko.md`](docs/performance-scenarios.ko.md).
 An example daemon measurement is recorded in
 [`docs/performance-results.ko.md`](docs/performance-results.ko.md).
+An additional reclaim validation report, focused on unused tagged images,
+dangling images, unused volumes, and Docker Desktop VHDX behavior, is recorded
+in [`docs/reclaim-validation-report.ko.md`](docs/reclaim-validation-report.ko.md).
 
 ## Problems panel
 

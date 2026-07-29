@@ -26,6 +26,24 @@ Docker Engine이나 Docker CLI를 대체하는 범용 명령어 래퍼는 아닙
 Networks, 단순 Events 타임라인, `exec`, 컨테이너 start/stop/restart, 이미지
 pull 진행률 화면은 현재 제품 범위에서 제외했습니다.
 
+## 스크린샷
+
+| Containers | Images |
+|---|---|
+| ![Containers panel](docs/images/dockviz-containers.svg) | ![Images panel](docs/images/dockviz-images.svg) |
+
+| Problems | Disk Usage |
+|---|---|
+| ![Problems panel](docs/images/dockviz-problems.svg) | ![Disk Usage panel](docs/images/dockviz-disk-usage.svg) |
+
+Disk cleanup은 확인창을 거쳐 실행됩니다. Build Cache는 사용 중이 아닌 cache
+layer만 정리하고, Local Volumes는 실제 애플리케이션 데이터가 들어 있을 수
+있으므로 별도 경고를 표시합니다.
+
+| Build Cache 확인창 | Local Volumes 확인창 |
+|---|---|
+| ![Build Cache prune confirmation](docs/images/dockviz-confirm-build-cache.svg) | ![Local Volumes prune confirmation](docs/images/dockviz-confirm-volumes.svg) |
+
 ## 설치와 업데이트
 
 PyPI 설치:
@@ -216,6 +234,9 @@ powershell -ExecutionPolicy Bypass -File .\scenarios\run-dockviz-performance.ps1
 [`docs/performance-scenarios.ko.md`](docs/performance-scenarios.ko.md)를 참고한다.
 실제 daemon에서 실행한 검증 결과는
 [`docs/performance-results.ko.md`](docs/performance-results.ko.md)에 정리되어 있다.
+unused tagged image, dangling image, unused volume, Docker Desktop VHDX
+동작을 실제 daemon에서 검증한 상세 리포트는
+[`docs/reclaim-validation-report.ko.md`](docs/reclaim-validation-report.ko.md)에 정리되어 있다.
 
 ## License
 

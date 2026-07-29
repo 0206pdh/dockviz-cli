@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="815" height="430" viewBox="0 0 815 430">
+  <rect width="815" height="430" fill="#151719"/>
+  <style>.mono{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#d7e0ea}.dim{fill:#8fa3b8}.blue{fill:#45a3ff;font-weight:700}.cyan{fill:#00d7d7;font-weight:700}</style>
+  <text x="24" y="22" class="mono blue">dockviz</text><text x="128" y="22" class="mono dim">v0.5.0  •  6 containers</text>
+  <text x="32" y="42" class="mono dim">📦 Containers</text><text x="210" y="42" class="mono dim">▰ Images</text><text x="365" y="42" class="mono dim">⚠Problems</text><rect x="474" y="25" width="172" height="23" fill="#00d7d7"/><text x="484" y="42" class="mono" fill="#000">▶💾 Disk Usage ◀</text>
+  <line x1="24" y1="58" x2="565" y2="58" stroke="#607080"/>
+  <text x="26" y="108" class="mono blue">TYPE</text><text x="176" y="108" class="mono blue">TOTAL</text><text x="250" y="108" class="mono blue">ACTIVE</text><text x="322" y="108" class="mono blue">SIZE</text><text x="420" y="108" class="mono blue">RECLAIMABLE</text>
+  <rect x="6" y="114" width="522" height="21" fill="#4aa3ff"/>
+  <text x="10" y="130" class="mono" fill="#000">▶Images</text><text x="178" y="130" class="mono" fill="#000">9</text><text x="250" y="130" class="mono" fill="#000">5</text><text x="322" y="130" class="mono" fill="#000">1.2 GB</text><text x="420" y="130" class="mono" fill="#000">410 MB</text>
+  <text x="24" y="152" class="mono">Containers</text><text x="178" y="152" class="mono">6</text><text x="250" y="152" class="mono">5</text><text x="322" y="152" class="mono">62 MB</text><text x="420" y="152" class="mono">18 MB</text>
+  <text x="24" y="174" class="mono">Local Volumes</text><text x="178" y="174" class="mono">4</text><text x="250" y="174" class="mono">2</text><text x="322" y="174" class="mono">512 MB</text><text x="420" y="174" class="mono">96 MB</text>
+  <text x="24" y="196" class="mono">Build Cache</text><text x="178" y="196" class="mono">37</text><text x="250" y="196" class="mono">2</text><text x="322" y="196" class="mono">2.8 GB</text><text x="420" y="196" class="mono">2.5 GB</text>
+  <text x="24" y="218" class="mono">Container Logs</text><text x="178" y="218" class="mono">6</text><text x="250" y="218" class="mono">5</text><text x="322" y="218" class="mono">734 MB</text><text x="420" y="218" class="mono">734 MB</text>
+  <text x="24" y="262" class="mono blue">HOST STORAGE</text>
+  <text x="24" y="286" class="mono">Docker Desktop VHDX</text><text x="230" y="286" class="mono">19.0 GB</text><text x="330" y="286" class="mono">host free 27.4 GB</text>
+  <text x="24" y="308" class="mono dim">outside Docker df: 13.7 GB (not a prune estimate)</text>
+  <text x="24" y="330" class="mono dim">C:\Users\demo\AppData\Local\Docker\wsl\disk\docker_data.vhdx</text>
+  <text x="24" y="352" class="mono dim">docker prune frees Docker objects; VHDX compaction returns this allocation to Windows</text>
+  <text x="16" y="395" class="mono dim">[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [r] Refresh</text><text x="16" y="417" class="mono dim">[d] Prune selected category  •  0B = measured zero  •  N/A = unavailable</text>
+</svg>

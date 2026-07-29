@@ -27,7 +27,11 @@ func detectDockerDesktopHostStorage(host string) HostStorageInfo {
 			continue
 		}
 		info.Path = path
-		info.AllocatedMB = bytesToMB(fi.Size())
+		allocatedBytes, err := fileAllocatedBytes(path)
+		if err != nil {
+			allocatedBytes = uint64(fi.Size())
+		}
+		info.AllocatedMB = bytesToMB(int64(allocatedBytes))
 		info.HostFreeMB, _ = freeSpaceMB(path)
 		info.Available = true
 		return info
@@ -61,4 +65,25 @@ func freeSpaceMB(path string) (float64, error) {
 		return 0, fmt.Errorf("GetDiskFreeSpaceExW failed: %w", callErr)
 	}
 	return bytesToMB(int64(freeBytesAvailable)), nil
+}
+
+func fileAllocatedBytes(path string) (uint64, error) {
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	proc := kernel32.NewProc("GetCompressedFileSizeW")
+	pathPtr, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, err
+	}
+
+	var high uint32
+	low, _, callErr := proc.Call(
+		uintptr(unsafe.Pointer(pathPtr)),
+		uintptr(unsafe.Pointer(&high)),
+	)
+	if low == 0xffffffff {
+		if errno, ok := callErr.(syscall.Errno); ok && errno != 0 {
+			return 0, fmt.Errorf("GetCompressedFileSizeW failed: %w", callErr)
+		}
+	}
+	return (uint64(high) << 32) + uint64(low), nil
 }

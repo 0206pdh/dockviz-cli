@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="790" height="330" viewBox="0 0 790 330">
+  <rect width="790" height="330" fill="#151719"/>
+  <style>
+    .mono{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#d7e0ea}
+    .dim{fill:#8fa3b8}.blue{fill:#45a3ff;font-weight:700}.cyan{fill:#00d7d7;font-weight:700}.green{fill:#00d084;font-weight:700}.red{fill:#ff4d6d}
+  </style>
+  <text x="24" y="22" class="mono blue">dockviz</text>
+  <text x="128" y="22" class="mono dim">v0.5.0  •  6 containers</text>
+  <rect x="22" y="25" width="168" height="23" fill="#00d7d7"/>
+  <text x="32" y="42" class="mono" fill="#000">▶ 📦 Containers ◀</text>
+  <text x="230" y="42" class="mono dim">▰ Images</text>
+  <text x="365" y="42" class="mono dim">⚠Problems</text>
+  <text x="520" y="42" class="mono dim">💾 Disk Usage</text>
+  <line x1="24" y1="58" x2="560" y2="58" stroke="#607080"/>
+  <text x="25" y="108" class="mono blue">NAME</text><text x="210" y="108" class="mono blue">GRAPH</text><text x="305" y="108" class="mono blue">CPU</text><text x="390" y="108" class="mono blue">MEM</text><text x="472" y="108" class="mono blue">STATUS</text><text x="590" y="108" class="mono blue">PORTS</text>
+  <rect x="6" y="114" width="743" height="21" fill="#4aa3ff"/>
+  <text x="10" y="130" class="mono" fill="#000">▶nginx-proxy</text><text x="210" y="130" class="mono green">────▂▂▂──</text><text x="310" y="130" class="mono" fill="#000">1.5%</text><text x="390" y="130" class="mono" fill="#000">69MB</text><text x="472" y="130" class="mono green">● running</text><text x="590" y="130" class="mono" fill="#000">80:80, 443:443</text>
+  <text x="24" y="152" class="mono">api-server</text><text x="210" y="152" class="mono green">▁──────▃▃</text><text x="310" y="152" class="mono">5.0%</text><text x="390" y="152" class="mono">168MB</text><text x="472" y="152" class="mono green">● running</text><text x="590" y="152" class="mono">3000:3000</text>
+  <text x="24" y="174" class="mono">postgres-db</text><text x="210" y="174" class="mono green">──▁────▂</text><text x="310" y="174" class="mono">17.8%</text><text x="390" y="174" class="mono">39MB</text><text x="472" y="174" class="mono green">● running</text><text x="590" y="174" class="mono">5432</text>
+  <text x="24" y="196" class="mono">redis-cache</text><text x="210" y="196" class="mono green">────────</text><text x="310" y="196" class="mono">10.4%</text><text x="390" y="196" class="mono">188MB</text><text x="472" y="196" class="mono green">● running</text><text x="590" y="196" class="mono">6379</text>
+  <text x="24" y="218" class="mono">worker</text><text x="210" y="218" class="mono green">─▂──▁───</text><text x="310" y="218" class="mono">2.6%</text><text x="390" y="218" class="mono">111MB</text><text x="472" y="218" class="mono green">● running</text><text x="590" y="218" class="mono">-</text>
+  <text x="24" y="240" class="mono">db-migration</text><text x="310" y="240" class="mono">-</text><text x="390" y="240" class="mono">-</text><text x="472" y="240" class="mono red">○ exited</text><text x="590" y="240" class="mono">-</text>
+  <text x="16" y="286" class="mono dim">[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [r] Refresh</text>
+  <text x="16" y="309" class="mono dim">[Enter] Detail  [d] Delete  [l] Logs  [g] Chart</text>
+</svg>

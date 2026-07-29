@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="530" height="350" viewBox="0 0 530 350">
+  <rect width="530" height="350" fill="#151719"/>
+  <style>.mono{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#d7e0ea}.red{fill:#ff3b63;font-weight:700}.dim{fill:#8fa3b8}</style>
+  <rect x="20" y="48" width="460" height="286" fill="none" stroke="#ff3b63" stroke-width="2"/>
+  <rect x="38" y="62" width="460" height="286" fill="none" stroke="#ff3b63" stroke-width="2"/>
+  <text x="80" y="102" class="mono red">⚠ Confirm Delete</text>
+  <text x="62" y="146" class="mono">Prune:  <tspan font-weight="700">Local Volumes</tspan></text>
+  <text x="62" y="190" class="mono dim">Removes volumes not attached to any</text>
+  <text x="62" y="212" class="mono dim">container.</text>
+  <text x="62" y="234" class="mono dim">This can permanently delete data stored in</text>
+  <text x="62" y="256" class="mono dim">those volumes.</text>
+  <text x="62" y="304" class="mono red">[y] Yes, remove</text>
+  <text x="232" y="304" class="mono dim">[n / Esc] Cancel</text>
+</svg>

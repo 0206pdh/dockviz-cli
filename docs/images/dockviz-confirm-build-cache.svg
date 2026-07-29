@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="530" height="305" viewBox="0 0 530 305">
+  <rect width="530" height="305" fill="#151719"/>
+  <style>.mono{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#d7e0ea}.red{fill:#ff3b63;font-weight:700}.dim{fill:#8fa3b8}</style>
+  <rect x="20" y="35" width="460" height="240" fill="none" stroke="#ff3b63" stroke-width="2"/>
+  <rect x="38" y="48" width="460" height="240" fill="none" stroke="#ff3b63" stroke-width="2"/>
+  <text x="80" y="86" class="mono red">⚠ Confirm Delete</text>
+  <text x="62" y="130" class="mono">Prune:  <tspan font-weight="700">Build Cache</tspan></text>
+  <text x="62" y="174" class="mono dim">Removes build cache layers not in use by a</text>
+  <text x="62" y="196" class="mono dim">running build.</text>
+  <text x="62" y="242" class="mono red">[y] Yes, remove</text>
+  <text x="232" y="242" class="mono dim">[n / Esc] Cancel</text>
+</svg>
