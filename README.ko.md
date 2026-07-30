@@ -97,6 +97,18 @@ Docker 없이 가상 데이터로 실행:
 dockviz --demo
 ```
 
+Compose context 자동 탐색:
+
+```bash
+dockviz
+```
+
+Compose 파일 명시:
+
+```bash
+dockviz -f compose.yaml -f compose.override.yaml
+```
+
 원격 daemon 연결:
 
 ```bash
@@ -105,6 +117,29 @@ dockviz --host tcp://192.168.1.100:2375
 
 또는 `DOCKER_HOST`를 사용할 수 있습니다. 일반 실행은 시작 전에 Docker
 `Ping()`을 호출하며, `--demo`만 실제 daemon 연결을 생략합니다.
+
+## Compose context
+
+Compose 파일이 있으면 `dockviz`는
+[`compose-go`](https://github.com/compose-spec/compose-go)로 파일을 읽고,
+실제 Docker daemon에서 가져온 실행 중 컨테이너 정보 위에 service context를
+겹쳐서 보여줍니다.
+
+자동 탐색 대상:
+
+- `compose.yaml`
+- `compose.yml`
+- `docker-compose.yaml`
+- `docker-compose.yml`
+
+`-f/--compose-file`은 여러 번 사용할 수 있습니다. Compose context는 read-only이며
+실제 파일을 수정하지 않습니다.
+
+활용 위치:
+
+- container detail에서 service dependency, dependent, network, configured volume, configured port, Compose 파일 source 표시;
+- problem detail에서 문제 컨테이너의 service blast radius 표시;
+- Compose 파일이 없어도 live container label과 Docker daemon 정보만으로 계속 동작.
 
 ## Problems 패널
 

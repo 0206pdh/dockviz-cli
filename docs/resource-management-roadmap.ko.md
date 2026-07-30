@@ -46,9 +46,10 @@
 
 상태: 구현 완료
 
-- `com.docker.compose.project`, `com.docker.compose.service` label을 읽어 compose project별로 묶는다.
+- `compose-go`로 Compose 파일을 읽고, `com.docker.compose.project`, `com.docker.compose.service` label과 매칭한다.
 - Containers 패널 상단에 project 단위 CPU/MEM 합계와 top offender를 표시한다.
 - Detail 화면에 compose project/service 정보를 표시한다.
+- Detail 화면에 depends_on, dependent service, network, configured volume, Compose file source를 표시한다.
 - 같은 service replica가 여러 개인 경우 service 단위로 합산하는 화면은 다음 refinement로 둔다.
 
 목적:

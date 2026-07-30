@@ -12,6 +12,7 @@ import (
 
 var demoMode bool
 var dockerHost string
+var composeFiles []string
 
 // rootCmd is the base command. Its Version field is set by Execute() before
 // the command tree is evaluated, so --version always reflects the build tag.
@@ -26,17 +27,24 @@ from Docker events, and provides guarded disk cleanup actions.
 
 Run with --demo to preview the dashboard without a running Docker daemon.`,
 	Example: `  dockviz                                  # connect to local Docker daemon
+  dockviz -f compose.yaml -f compose.override.yaml
   dockviz --demo                            # run with simulated data (no Docker required)
   dockviz --host tcp://192.168.1.100:2375   # connect to a remote Docker daemon
   dockviz --version                         # print version and exit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return tui.Start(demoMode, dockerHost, cmd.Version)
+		return tui.Start(tui.StartOptions{
+			Demo:         demoMode,
+			Host:         dockerHost,
+			Version:      cmd.Version,
+			ComposeFiles: composeFiles,
+		})
 	},
 }
 
 func init() {
 	rootCmd.Flags().BoolVar(&demoMode, "demo", false, "Run with simulated data (no Docker daemon required)")
 	rootCmd.Flags().StringVar(&dockerHost, "host", "", "Docker daemon socket or host (e.g. tcp://192.168.1.100:2375). Overrides DOCKER_HOST env var.")
+	rootCmd.Flags().StringArrayVarP(&composeFiles, "compose-file", "f", nil, "Compose file path. Can be used multiple times. Defaults to compose.yaml/docker-compose.yml discovery.")
 }
 
 // Execute is called from main.go. It injects the build-time version string

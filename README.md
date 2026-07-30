@@ -33,6 +33,7 @@ you need a compact, continuously updating view of several resources at once:
 
 - container CPU, memory, status, ports, logs, and recent history;
 - resource summaries with current, p95, peak/trend detail, and CPU/MEM limits;
+- Compose context for services, dependencies, networks, and configured volumes;
 - actionable problems derived from Docker events;
 - image, stopped-container, volume, build-cache, and container-log usage;
 - confirmation-gated cleanup actions with the reported reclaimed space.
@@ -143,6 +144,12 @@ go build -o dockviz.exe .   # Windows
 # Connect to the local Docker daemon
 dockviz
 
+# Load Compose context from compose.yaml/docker-compose.yml in the current directory
+dockviz
+
+# Or pass one or more Compose files explicitly
+dockviz -f compose.yaml -f compose.override.yaml
+
 # Run with simulated data; no Docker daemon is required
 dockviz --demo
 
@@ -158,6 +165,23 @@ dockviz --version
 
 The default path calls Docker `Ping()` before starting the TUI. `--demo` is
 the only mode that avoids a live daemon.
+
+## Compose context
+
+When a Compose file is present, `dockviz` parses it with
+[`compose-go`](https://github.com/compose-spec/compose-go) and overlays that
+configuration on top of live daemon data. It auto-discovers `compose.yaml`,
+`compose.yml`, `docker-compose.yaml`, and `docker-compose.yml` from the current
+directory. Use `-f/--compose-file` multiple times for explicit files.
+
+Compose context is read-only. It is used to explain impact:
+
+- container detail shows service dependencies, dependents, networks, configured
+  volumes, configured ports, and the Compose file source;
+- problem detail shows the same service blast radius before you prune, delete,
+  restart externally, or change limits;
+- live container labels remain the primary runtime source, so dockviz still
+  works without a Compose file.
 
 ## Quantitative scenario test
 

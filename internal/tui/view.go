@@ -695,6 +695,18 @@ func (m Model) renderDetail() string {
 		if c.ComposeService != "" {
 			lines = append(lines, row("Service", c.ComposeService))
 		}
+		if service, ok := m.composeServiceForContainer(c); ok {
+			lines = append(lines,
+				row("Depends", joinOrDash(service.DependsOn)),
+				row("Dependents", joinOrDash(service.Dependents)),
+				row("Networks", joinOrDash(service.Networks)),
+				row("CfgVolume", joinOrDash(service.Volumes)),
+				row("CfgPorts", joinOrDash(service.Ports)),
+			)
+			if files := m.composeFilesLabel(); files != "" {
+				lines = append(lines, row("Compose", files))
+			}
+		}
 		lines = append(lines, row("Ports", c.Ports))
 
 		if c.Status == "running" {
@@ -759,6 +771,19 @@ func (m Model) renderProblemDetail() string {
 			row("Current MEM", formatMB(c.MemMB)),
 			row("Limits", formatLimits(c)),
 		)
+	}
+	if service, ok := m.composeServiceByContainerName(p.Name); ok {
+		lines = append(lines,
+			"",
+			row("Depends", joinOrDash(service.DependsOn)),
+			row("Dependents", joinOrDash(service.Dependents)),
+			row("Networks", joinOrDash(service.Networks)),
+			row("CfgVolume", joinOrDash(service.Volumes)),
+			row("CfgPorts", joinOrDash(service.Ports)),
+		)
+		if files := m.composeFilesLabel(); files != "" {
+			lines = append(lines, row("Compose", files))
+		}
 	}
 
 	if p.Recommendation != "" {

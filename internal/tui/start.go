@@ -3,21 +3,31 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 
+	composectx "github.com/0206pdh/dockviz-cli/internal/compose"
 	"github.com/0206pdh/dockviz-cli/internal/docker"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// StartOptions configures the TUI entry point.
+type StartOptions struct {
+	Demo         bool
+	Host         string
+	Version      string
+	ComposeFiles []string
+}
+
 // Start connects to Docker (or uses demo data), builds the model, and runs the TUI.
-// Pass demo=true to run without a live Docker daemon.
-// host overrides DOCKER_HOST when non-empty (e.g. "tcp://192.168.1.100:2375").
-func Start(demo bool, host string, version string) error {
+// Demo mode runs without a live Docker daemon. Host overrides DOCKER_HOST when
+// non-empty (e.g. "tcp://192.168.1.100:2375").
+func Start(opts StartOptions) error {
 	var dc docker.DockerClient
-	if demo {
+	if opts.Demo {
 		dc = docker.NewDemoClient()
 	} else {
-		real, err := docker.NewClient(host)
+		real, err := docker.NewClient(opts.Host)
 		if err != nil {
 			return fmt.Errorf("docker: %w", err)
 		}
@@ -25,7 +35,12 @@ func Start(demo bool, host string, version string) error {
 	}
 	defer dc.Close()
 
-	m := newModel(dc, version, demo)
+	composeContext, err := composectx.Load(context.Background(), "", opts.ComposeFiles)
+	if err != nil {
+		return fmt.Errorf("compose: %w", err)
+	}
+
+	m := newModel(dc, opts.Version, opts.Demo, composeContext)
 
 	// Init() on the model handles the first fetch and tick automatically.
 	p := tea.NewProgram(m,

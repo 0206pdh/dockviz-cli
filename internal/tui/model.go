@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	composectx "github.com/0206pdh/dockviz-cli/internal/compose"
 	"github.com/0206pdh/dockviz-cli/internal/docker"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -85,6 +86,8 @@ type Model struct {
 
 	// Docker connection (real or demo)
 	docker docker.DockerClient
+	// Optional compose file context loaded from the working directory or -f.
+	composeContext *composectx.Context
 
 	// Current data
 	containers []docker.ContainerInfo
@@ -148,7 +151,7 @@ func (m Model) Init() tea.Cmd {
 
 // newModel creates the initial Model. Accepts any DockerClient (real or demo).
 // Event streaming is started here so Init() can register the first waitForEventCmd.
-func newModel(dc docker.DockerClient, version string, demo bool) Model {
+func newModel(dc docker.DockerClient, version string, demo bool, composeContext *composectx.Context) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 
@@ -156,18 +159,19 @@ func newModel(dc docker.DockerClient, version string, demo bool) Model {
 	eventCh := dc.StreamEvents(eventCtx)
 
 	return Model{
-		version:     version,
-		demo:        demo,
-		docker:      dc,
-		activePanel: PanelContainers,
-		activeView:  ViewDashboard,
-		keys:        DefaultKeyMap(),
-		spinner:     sp,
-		loading:     true,
-		history:     make(map[string][]float64),
-		memHistory:  make(map[string][]float64),
-		eventCh:     eventCh,
-		eventCancel: eventCancel,
+		version:        version,
+		demo:           demo,
+		docker:         dc,
+		composeContext: composeContext,
+		activePanel:    PanelContainers,
+		activeView:     ViewDashboard,
+		keys:           DefaultKeyMap(),
+		spinner:        sp,
+		loading:        true,
+		history:        make(map[string][]float64),
+		memHistory:     make(map[string][]float64),
+		eventCh:        eventCh,
+		eventCancel:    eventCancel,
 	}
 }
 

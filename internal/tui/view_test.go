@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	composectx "github.com/0206pdh/dockviz-cli/internal/compose"
 	"github.com/0206pdh/dockviz-cli/internal/docker"
 )
 
@@ -129,6 +130,19 @@ func TestRenderContainersShowsResourceSummaries(t *testing.T) {
 func TestRenderDetailShowsResourceSummary(t *testing.T) {
 	m := Model{
 		selectedID: "abc123",
+		composeContext: &composectx.Context{
+			Files: []string{`C:\repo\compose.yaml`},
+			Services: map[string]composectx.ServiceContext{
+				"api": {
+					Name:       "api",
+					DependsOn:  []string{"db"},
+					Dependents: []string{"worker"},
+					Networks:   []string{"backend"},
+					Volumes:    []string{"api_data -> /data"},
+					Ports:      []string{"8080->80/tcp"},
+				},
+			},
+		},
 		containers: []docker.ContainerInfo{
 			{
 				ID:             "abc123",
@@ -150,7 +164,7 @@ func TestRenderDetailShowsResourceSummary(t *testing.T) {
 	}
 
 	view := m.renderDetail()
-	for _, want := range []string{"Project", "shop", "Service", "api", "CPU", "Memory", "avg", "p95", "peak", "trend", "Limits"} {
+	for _, want := range []string{"Project", "shop", "Service", "api", "Depends", "db", "Dependents", "worker", "Networks", "backend", "CfgVolume", "api_data", "CfgPorts", "8080", "Compose", "compose.yaml", "CPU", "Memory", "avg", "p95", "peak", "trend", "Limits"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("renderDetail() missing %q in:\n%s", want, view)
 		}
@@ -161,6 +175,19 @@ func TestRenderProblemDetailShowsRecommendation(t *testing.T) {
 	m := Model{
 		activePanel: PanelProblems,
 		activeView:  ViewDetail,
+		composeContext: &composectx.Context{
+			Files: []string{`C:\repo\compose.yaml`},
+			Services: map[string]composectx.ServiceContext{
+				"api": {
+					Name:       "api",
+					DependsOn:  []string{"db"},
+					Dependents: []string{"worker"},
+					Networks:   []string{"backend"},
+					Volumes:    []string{"api_data -> /data"},
+					Ports:      []string{"8080->80/tcp"},
+				},
+			},
+		},
 		containers: []docker.ContainerInfo{
 			{
 				ID:             "abc123",
@@ -177,7 +204,7 @@ func TestRenderProblemDetailShowsRecommendation(t *testing.T) {
 	}
 
 	view := m.renderDetail()
-	for _, want := range []string{"Problem Detail", "High CPU", "Recommendation", "shop", "api", "Current CPU"} {
+	for _, want := range []string{"Problem Detail", "High CPU", "Recommendation", "shop", "api", "Current CPU", "Depends", "db", "Dependents", "worker", "Networks", "backend", "CfgPorts", "8080"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("renderDetail() missing %q in:\n%s", want, view)
 		}
