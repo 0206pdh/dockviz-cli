@@ -1,31 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="850" height="405" viewBox="0 0 850 405">
-  <rect width="850" height="405" fill="#151719"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="432" viewBox="0 0 850 432">
+  <rect width="850" height="432" fill="#151719"/>
   <style>
     .mono{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#d7e0ea}
-    .dim{fill:#8fa3b8}.blue{fill:#45a3ff;font-weight:700}.cyan{fill:#00d7d7;font-weight:700}.green{fill:#00d084;font-weight:700}.red{fill:#ff4d6d}
-    .black{fill:#000}
+    .title{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#45a3ff;font-weight:700}
+    .dim{fill:#8fa3b8}.blue{fill:#45a3ff;font-weight:700}.cyan{fill:#00d7d7;font-weight:700}.green{fill:#00d084;font-weight:700}.red{fill:#ff4d6d}.black{fill:#000}
   </style>
-  <text x="24" y="22" class="mono blue">dockviz</text>
-  <text x="128" y="22" class="mono dim">v0.7.0  -  6 containers</text>
-  <rect x="22" y="25" width="170" height="23" fill="#00d7d7"/>
-  <text x="32" y="42" class="mono black">&gt; Containers &lt;</text>
-  <text x="230" y="42" class="mono dim">Images</text>
-  <text x="365" y="42" class="mono dim">Problems</text>
-  <text x="520" y="42" class="mono dim">Disk Usage</text>
-  <line x1="24" y1="58" x2="560" y2="58" stroke="#607080"/>
+  <text x="24" y="22" class="title">dockviz</text>
+  <text x="124" y="22" class="mono dim">v0.7.0  -  6 containers</text>
 
-  <text x="25" y="92" class="mono blue">PROJECT RESOURCE SUMMARY</text>
-  <text x="25" y="116" class="mono blue">PROJECT</text><text x="205" y="116" class="mono blue">RUN</text><text x="275" y="116" class="mono blue">CPU</text><text x="345" y="116" class="mono blue">MEM</text><text x="430" y="116" class="mono blue">LIMITS</text><text x="575" y="116" class="mono blue">TOP CPU</text>
-  <text x="25" y="138" class="mono">demo-stack</text><text x="205" y="138" class="mono">5/6</text><text x="275" y="138" class="mono">37.3%</text><text x="345" y="138" class="mono">620MB</text><text x="430" y="138" class="mono">CPU:4.5 MEM:1.1GB +nolimit</text><text x="575" y="138" class="mono">worker 34.5%</text>
+  <rect x="16" y="29" width="171" height="22" fill="#00d7d7"/>
+  <text x="28" y="45" class="mono black">&gt; Containers &lt;</text>
+  <text x="222" y="45" class="mono dim">Images</text>
+  <text x="358" y="45" class="mono dim">Problems</text>
+  <text x="505" y="45" class="mono dim">Disk Usage</text>
+  <line x1="16" y1="60" x2="560" y2="60" stroke="#607080"/>
 
-  <text x="25" y="178" class="mono blue">NAME</text><text x="190" y="178" class="mono blue">GRAPH</text><text x="290" y="178" class="mono blue">CPU</text><text x="360" y="178" class="mono blue">CPU95</text><text x="435" y="178" class="mono blue">MEM</text><text x="505" y="178" class="mono blue">MEM95</text><text x="582" y="178" class="mono blue">LIMITS</text><text x="725" y="178" class="mono blue">STATUS</text>
-  <rect x="6" y="184" width="825" height="21" fill="#4aa3ff"/>
-  <text x="10" y="200" class="mono black">&gt; nginx-proxy</text><text x="190" y="200" class="mono green">▁▁▂▃▄▃▂▁</text><text x="290" y="200" class="mono black">1.5%</text><text x="360" y="200" class="mono black">2.2%</text><text x="435" y="200" class="mono black">69MB</text><text x="505" y="200" class="mono black">74MB</text><text x="582" y="200" class="mono black">CPU:1.0 MEM:128</text><text x="725" y="200" class="mono green">running</text>
-  <text x="24" y="222" class="mono">api-server</text><text x="190" y="222" class="mono green">▂▃▄▅▆▇▆▅</text><text x="290" y="222" class="mono">18.4%</text><text x="360" y="222" class="mono">23.0%</text><text x="435" y="222" class="mono">210MB</text><text x="505" y="222" class="mono">230MB</text><text x="582" y="222" class="mono">CPU:- MEM:-</text><text x="725" y="222" class="mono green">running</text>
-  <text x="24" y="244" class="mono">postgres-db</text><text x="190" y="244" class="mono green">▁▁▁▂▁▁▁▁</text><text x="290" y="244" class="mono">0.9%</text><text x="360" y="244" class="mono">1.2%</text><text x="435" y="244" class="mono">128MB</text><text x="505" y="244" class="mono">132MB</text><text x="582" y="244" class="mono">CPU:2.0 MEM:512</text><text x="725" y="244" class="mono green">running</text>
-  <text x="24" y="266" class="mono">redis-cache</text><text x="190" y="266" class="mono green">▁▁▁▁▁▁▁▁</text><text x="290" y="266" class="mono">0.2%</text><text x="360" y="266" class="mono">0.3%</text><text x="435" y="266" class="mono">12MB</text><text x="505" y="266" class="mono">14MB</text><text x="582" y="266" class="mono">CPU:0.5 MEM:64</text><text x="725" y="266" class="mono green">running</text>
-  <text x="24" y="288" class="mono">worker</text><text x="190" y="288" class="mono green">▃▄▅▆▇▆▅▄</text><text x="290" y="288" class="mono">34.5%</text><text x="360" y="288" class="mono">39.0%</text><text x="435" y="288" class="mono">320MB</text><text x="505" y="288" class="mono">340MB</text><text x="582" y="288" class="mono">CPU:1.0 MEM:384</text><text x="725" y="288" class="mono green">running</text>
-  <text x="24" y="310" class="mono">db-migration</text><text x="290" y="310" class="mono">-</text><text x="360" y="310" class="mono">-</text><text x="435" y="310" class="mono">-</text><text x="505" y="310" class="mono">-</text><text x="582" y="310" class="mono">CPU:- MEM:-</text><text x="725" y="310" class="mono red">exited</text>
-  <text x="16" y="356" class="mono dim">[q] Quit  [Tab] Switch Panel  [Up/Down] Navigate  [r] Refresh</text>
-  <text x="16" y="379" class="mono dim">[Enter] Detail  [d] Delete  [l] Logs  [g] Chart</text>
+  <text x="16" y="112" class="title">PROJECT RESOURCE SUMMARY</text>
+  <text x="16" y="136" class="title">PROJECT</text>
+  <text x="186" y="136" class="title">RUN</text>
+  <text x="258" y="136" class="title">CPU</text>
+  <text x="330" y="136" class="title">MEM</text>
+  <text x="412" y="136" class="title">LIMITS</text>
+  <text x="638" y="136" class="title">TOP CPU</text>
+  <line x1="16" y1="140" x2="800" y2="140" stroke="#45a3ff"/>
+  <text x="16" y="158" class="mono">demo-stack</text>
+  <text x="186" y="158" class="mono">5/6</text>
+  <text x="258" y="158" class="mono">46.0%</text>
+  <text x="330" y="158" class="mono">522MB</text>
+  <text x="412" y="158" class="mono">CPU:4.5 MEM:1.1GB +2 no...</text>
+  <text x="638" y="158" class="mono">worker 14.9%</text>
+
+  <text x="16" y="202" class="title">NAME</text>
+  <text x="186" y="202" class="title">GRAPH</text>
+  <text x="286" y="202" class="title">CPU</text>
+  <text x="358" y="202" class="title">CPU95</text>
+  <text x="430" y="202" class="title">MEM</text>
+  <text x="505" y="202" class="title">MEM95</text>
+  <text x="592" y="202" class="title">LIMITS</text>
+  <text x="726" y="202" class="title">STATUS</text>
+  <line x1="16" y1="206" x2="835" y2="206" stroke="#45a3ff"/>
+
+  <text x="16" y="224" class="mono">nginx-proxy</text>
+  <text x="186" y="224" class="mono green">▁▁▂▃▂▁▁▁</text>
+  <text x="286" y="224" class="mono">2.2%</text><text x="358" y="224" class="mono">19.3%</text><text x="430" y="224" class="mono">122MB</text><text x="505" y="224" class="mono">197MB</text><text x="592" y="224" class="mono">CPU:1.0 MEM:1...</text><text x="726" y="224" class="mono green">running</text>
+  <text x="16" y="246" class="mono">api-server</text>
+  <text x="186" y="246" class="mono green">▁▁▁▁▁▁▁▁</text>
+  <text x="286" y="246" class="mono">13.8%</text><text x="358" y="246" class="mono">17.9%</text><text x="430" y="246" class="mono">140MB</text><text x="505" y="246" class="mono">182MB</text><text x="592" y="246" class="mono">CPU:- MEM:-</text><text x="726" y="246" class="mono green">running</text>
+
+  <rect x="0" y="250" width="848" height="22" fill="#4aa3ff"/>
+  <text x="2" y="267" class="mono black">&gt;postgres-db</text>
+  <text x="186" y="267" class="mono green">▂▃▂▁▁▁▁▁</text>
+  <text x="286" y="267" class="mono black">0.6%</text><text x="358" y="267" class="mono black">17.4%</text><text x="430" y="267" class="mono black">195MB</text><text x="505" y="267" class="mono black">192MB</text><text x="592" y="267" class="mono black">CPU:2.0 MEM:5...</text><text x="726" y="267" class="mono green">running</text>
+
+  <text x="16" y="290" class="mono">redis-cache</text>
+  <text x="186" y="290" class="mono green">▁▁▁▁▁▁▁▁</text>
+  <text x="286" y="290" class="mono">14.4%</text><text x="358" y="290" class="mono">19.6%</text><text x="430" y="290" class="mono">13MB</text><text x="505" y="290" class="mono">186MB</text><text x="592" y="290" class="mono">CPU:0.5 MEM:6...</text><text x="726" y="290" class="mono green">running</text>
+  <text x="16" y="312" class="mono">worker</text>
+  <text x="186" y="312" class="mono green">▂▃▂▂▃▁▂▃</text>
+  <text x="286" y="312" class="mono">14.9%</text><text x="358" y="312" class="mono">19.8%</text><text x="430" y="312" class="mono">51MB</text><text x="505" y="312" class="mono">197MB</text><text x="592" y="312" class="mono">CPU:1.0 MEM:3...</text><text x="726" y="312" class="mono green">running</text>
+  <text x="16" y="334" class="mono">db-migration</text>
+  <text x="286" y="334" class="mono">-</text><text x="358" y="334" class="mono">-</text><text x="430" y="334" class="mono">-</text><text x="505" y="334" class="mono">-</text><text x="592" y="334" class="mono">CPU:- MEM:-</text><text x="726" y="334" class="mono red">exited</text>
+
+  <text x="8" y="379" class="mono dim">[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [r] Refresh</text>
+  <text x="8" y="402" class="mono dim">[Enter] Detail  [d] Delete  [l] Logs  [g] Chart</text>
 </svg>

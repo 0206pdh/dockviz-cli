@@ -28,13 +28,17 @@ pull 진행률 화면은 현재 제품 범위에서 제외했습니다.
 
 ## 스크린샷
 
-| Containers | Images |
+| Containers | Container detail |
 |---|---|
-| ![Containers panel](docs/images/dockviz-containers.svg) | ![Images panel](docs/images/dockviz-images.svg) |
+| ![Containers panel](docs/images/dockviz-containers.svg) | ![Container detail](docs/images/dockviz-container-detail.svg) |
 
-| Problems | Disk Usage |
+| Problems | Images |
 |---|---|
-| ![Problems panel](docs/images/dockviz-problems.svg) | ![Disk Usage panel](docs/images/dockviz-disk-usage.svg) |
+| ![Problems panel](docs/images/dockviz-problems.svg) | ![Images panel](docs/images/dockviz-images.svg) |
+
+| Disk Usage |
+|---|
+| ![Disk Usage panel](docs/images/dockviz-disk-usage.svg) |
 
 Disk cleanup은 확인창을 거쳐 실행됩니다. Build Cache는 사용 중이 아닌 cache
 layer만 정리하고, Local Volumes는 실제 애플리케이션 데이터가 들어 있을 수

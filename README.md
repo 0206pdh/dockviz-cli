@@ -53,13 +53,17 @@ image pull-progress screens are intentionally outside the current product scope.
 
 ## Screenshots
 
-| Containers | Images |
+| Containers | Container detail |
 |---|---|
-| ![Containers panel](docs/images/dockviz-containers.svg) | ![Images panel](docs/images/dockviz-images.svg) |
+| ![Containers panel](docs/images/dockviz-containers.svg) | ![Container detail](docs/images/dockviz-container-detail.svg) |
 
-| Problems | Disk Usage |
+| Problems | Images |
 |---|---|
-| ![Problems panel](docs/images/dockviz-problems.svg) | ![Disk Usage panel](docs/images/dockviz-disk-usage.svg) |
+| ![Problems panel](docs/images/dockviz-problems.svg) | ![Images panel](docs/images/dockviz-images.svg) |
+
+| Disk Usage |
+|---|
+| ![Disk Usage panel](docs/images/dockviz-disk-usage.svg) |
 
 Disk cleanup actions are confirmation-gated. Build cache cleanup removes only
 unused build-cache layers, while volume cleanup warns explicitly because unused

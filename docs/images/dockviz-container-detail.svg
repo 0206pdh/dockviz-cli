@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="842" height="402" viewBox="0 0 842 402">
+  <rect width="842" height="402" fill="#151719"/>
+  <style>
+    .mono{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#d7e0ea}
+    .title{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#45a3ff;font-weight:700}
+    .dim{fill:#8fa3b8}.green{fill:#00d084;font-weight:700}.white{fill:#fff}
+  </style>
+  <text x="34" y="30" class="title">postgres-db</text>
+
+  <text x="26" y="76" class="mono dim">ID</text>
+  <text x="108" y="76" class="mono white">c3d4e5f6a1b2</text>
+  <text x="26" y="98" class="mono dim">Image</text>
+  <text x="108" y="98" class="mono white">postgres:16</text>
+  <text x="26" y="120" class="mono dim">Status</text>
+  <text x="108" y="120" class="mono green">● running</text>
+  <text x="26" y="142" class="mono dim">Project</text>
+  <text x="108" y="142" class="mono white">demo-stack</text>
+  <text x="26" y="164" class="mono dim">Service</text>
+  <text x="108" y="164" class="mono white">postgres</text>
+  <text x="26" y="186" class="mono dim">Ports</text>
+  <text x="108" y="186" class="mono white">5432</text>
+
+  <text x="26" y="230" class="mono dim">CPU</text>
+  <text x="108" y="230" class="mono white">now 18.8%  avg 9.9%  p95 19.3%  peak 20.0%  trend flat</text>
+  <text x="26" y="252" class="mono dim">Memory</text>
+  <text x="108" y="252" class="mono white">now 71MB  avg 113MB  p95 192MB  peak 195MB  trend down</text>
+  <text x="26" y="274" class="mono dim">Limits</text>
+  <text x="108" y="274" class="mono white">CPU:2.0 MEM:512MB</text>
+  <text x="26" y="296" class="mono dim">Volumes</text>
+  <text x="108" y="296" class="mono white">postgres_data → /var/lib/postgresql/data</text>
+
+  <text x="36" y="340" class="mono dim">[Esc] Back</text>
+</svg>

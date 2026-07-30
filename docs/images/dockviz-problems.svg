@@ -1,14 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="775" height="300" viewBox="0 0 775 300">
-  <rect width="775" height="300" fill="#151719"/>
-  <style>.mono{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#d7e0ea}.dim{fill:#8fa3b8}.blue{fill:#45a3ff;font-weight:700}.cyan{fill:#00d7d7;font-weight:700}</style>
-  <text x="24" y="22" class="mono blue">dockviz</text><text x="128" y="22" class="mono dim">v0.7.0  -  6 containers</text>
-  <text x="32" y="42" class="mono dim">📦 Containers</text><text x="210" y="42" class="mono dim">▰ Images</text><rect x="332" y="25" width="145" height="23" fill="#00d7d7"/><text x="342" y="42" class="mono" fill="#000">▶⚠Problems ◀</text><text x="520" y="42" class="mono dim">💾 Disk Usage</text>
-  <line x1="24" y1="58" x2="560" y2="58" stroke="#607080"/>
-  <text x="26" y="108" class="mono blue">SEVERITY</text><text x="125" y="108" class="mono blue">TYPE</text><text x="315" y="108" class="mono blue">CONTAINER</text><text x="512" y="108" class="mono blue">DETAIL</text>
-  <rect x="8" y="114" width="558" height="21" fill="#4aa3ff"/>
-  <text x="25" y="130" class="mono" fill="#000">WARNING</text><text x="96" y="130" class="mono" fill="#000">Killed</text><text x="288" y="130" class="mono" fill="#000">postgres-db</text><text x="476" y="130" class="mono" fill="#000">Container received a kill signal</text>
-  <text x="25" y="152" class="mono">WARNING</text><text x="96" y="152" class="mono">High CPU</text><text x="288" y="152" class="mono">worker</text><text x="476" y="152" class="mono">avg 91.5%, p95 98.4%</text>
-  <text x="25" y="174" class="mono">WARNING</text><text x="96" y="174" class="mono">No resource limits</text><text x="288" y="174" class="mono">api-server</text><text x="476" y="174" class="mono">No CPU or memory limit</text>
-  <text x="26" y="206" class="mono">3 active problem(s) • source: Docker events + resource history</text>
-  <text x="16" y="246" class="mono dim">[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [r] Refresh</text><text x="16" y="268" class="mono dim">[Enter] inspect  •  live problem detection</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="851" height="412" viewBox="0 0 851 412">
+  <rect width="851" height="412" fill="#151719"/>
+  <style>
+    .mono{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#d7e0ea}
+    .title{font-family:Consolas,Menlo,monospace;font-size:16px;fill:#45a3ff;font-weight:700}
+    .dim{fill:#8fa3b8}.blue{fill:#45a3ff;font-weight:700}.cyan{fill:#00d7d7;font-weight:700}.green{fill:#00d084;font-weight:700}.red{fill:#ff4d6d;font-weight:700}.black{fill:#000}
+  </style>
+  <text x="42" y="20" class="title">dockviz</text>
+  <text x="140" y="20" class="mono dim">v0.7.0  -  6 containers</text>
+  <text x="52" y="43" class="mono dim">Containers</text>
+  <text x="220" y="43" class="mono dim">Images</text>
+  <rect x="338" y="24" width="144" height="23" fill="#00d7d7"/>
+  <text x="350" y="41" class="mono black">&gt; Problems &lt;</text>
+  <text x="522" y="43" class="mono dim">Disk Usage</text>
+  <line x1="22" y1="58" x2="572" y2="58" stroke="#607080"/>
+
+  <text x="33" y="108" class="title">SEVERITY</text>
+  <text x="123" y="108" class="title">TYPE</text>
+  <text x="320" y="108" class="title">CONTAINER</text>
+  <text x="510" y="108" class="title">DETAIL</text>
+  <line x1="14" y1="112" x2="797" y2="112" stroke="#45a3ff"/>
+
+  <text x="32" y="130" class="mono red">CRITICAL</text>
+  <text x="123" y="130" class="mono">Abnormal exit</text>
+  <text x="303" y="130" class="mono">worker</text>
+  <text x="491" y="130" class="mono">Container exited with code 137</text>
+
+  <text x="32" y="152" class="mono red">CRITICAL</text>
+  <text x="123" y="152" class="mono">OOM killed</text>
+  <text x="303" y="152" class="mono">postgres-db</text>
+  <text x="491" y="152" class="mono">Container was killed by the OOM handler</text>
+
+  <rect x="14" y="157" width="792" height="22" fill="#4aa3ff"/>
+  <text x="32" y="174" class="mono green">WARNING</text>
+  <text x="123" y="174" class="mono black">Memory pressure</text>
+  <text x="303" y="174" class="mono black">nginx-proxy</text>
+  <text x="491" y="174" class="mono black">p95 186MB near limit 128MB</text>
+
+  <text x="32" y="196" class="mono green">WARNING</text>
+  <text x="123" y="196" class="mono">No resource limits</text>
+  <text x="303" y="196" class="mono">api-server</text>
+  <text x="491" y="196" class="mono">No CPU or memory hard limit configured</text>
+
+  <text x="32" y="218" class="mono green">WARNING</text>
+  <text x="123" y="218" class="mono">Memory pressure</text>
+  <text x="303" y="218" class="mono">redis-cache</text>
+  <text x="491" y="218" class="mono">p95 189MB near limit 64MB</text>
+
+  <text x="32" y="240" class="mono green">WARNING</text>
+  <text x="123" y="240" class="mono">Killed</text>
+  <text x="303" y="240" class="mono">nginx-proxy</text>
+  <text x="491" y="240" class="mono">Container received a kill signal</text>
+
+  <text x="32" y="262" class="mono green">WARNING</text>
+  <text x="123" y="262" class="mono">Killed</text>
+  <text x="303" y="262" class="mono">redis-cache</text>
+  <text x="491" y="262" class="mono">Container received a kill signal</text>
+
+  <text x="32" y="307" class="mono">7 active problem(s) - source: Docker events + resource history</text>
+
+  <text x="24" y="349" class="mono dim">[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [r] Refresh</text>
+  <text x="24" y="372" class="mono dim">[Enter] inspect  -  live problem detection</text>
 </svg>
