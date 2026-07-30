@@ -178,10 +178,17 @@ powershell -ExecutionPolicy Bypass -File .\scenarios\run-dockviz-performance.ps1
 
 For application-level Docker resource comparison, pass the same fixed
 workload command with `-TargetImage` and `-TargetCommand` in both runs.
+For focused CPU/MEM health detection, run
+[`scenarios/run-dockviz-resource-health.ps1`](scenarios/run-dockviz-resource-health.ps1);
+it creates CPU hog, memory pressure, memory growth, and no-limit containers
+with compose-style labels so the Containers and Problems panels can be checked
+directly.
 The full Korean guide is in
 [`docs/performance-scenarios.ko.md`](docs/performance-scenarios.ko.md).
 An example daemon measurement is recorded in
 [`docs/performance-results.ko.md`](docs/performance-results.ko.md).
+The CPU/MEM health scenario smoke result is recorded in
+[`docs/resource-health-smoke-results.ko.md`](docs/resource-health-smoke-results.ko.md).
 An additional reclaim validation report, focused on unused tagged images,
 dangling images, unused volumes, and Docker Desktop VHDX behavior, is recorded
 in [`docs/reclaim-validation-report.ko.md`](docs/reclaim-validation-report.ko.md).
@@ -207,6 +214,8 @@ CPU/MEM history from the Containers panel. It currently reports:
 A later `start` or `unpause` event clears a crash/kill problem for that
 container. The initial event query covers the previous hour, while problem
 classification focuses on the recent ten-minute window.
+Press `[Enter]` on a problem to inspect its detail, current resource context,
+and a read-only recommendation.
 
 ## Disk Usage panel
 

@@ -67,3 +67,33 @@ powershell -ExecutionPolicy Bypass -File .\scenarios\run-dockviz-performance.ps1
 개선 버전에서는 `my-app:improved`로 바꾸고 동일한 command, 입력량, duration을 사용한다. HTTP 성능까지 주장하려면 요청량(RPS), 오류율, p50/p95 latency를 별도 workload generator로 수집해야 한다.
 
 이번에 실제 실행한 결과는 [performance-results.ko.md](performance-results.ko.md)에 기록되어 있다.
+
+## CPU/MEM health detection 시나리오
+
+디스크 정리 효과와 별도로 CPU/MEM 관리 기능을 확인하려면
+`scenarios/run-dockviz-resource-health.ps1`을 실행한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scenarios\run-dockviz-resource-health.ps1 `
+  -RunLabel resource-health `
+  -DurationSeconds 30 `
+  -SampleIntervalSeconds 2 `
+  -OutputDirectory .\artifacts
+```
+
+이 시나리오는 compose-style label을 가진 다음 컨테이너를 만든다.
+
+- CPU hog
+- memory pressure
+- memory growth
+- CPU/MEM limit이 없는 컨테이너
+
+예상 확인 지점:
+
+- Containers 패널 상단에 project resource summary가 표시된다.
+- Problems 패널에 `High CPU`, `Memory pressure`, `Memory growth`,
+  `No resource limits`가 표시된다.
+- Problems 패널에서 `[Enter]`를 누르면 detail과 read-only recommendation이 표시된다.
+
+실제 smoke 결과는
+[`resource-health-smoke-results.ko.md`](resource-health-smoke-results.ko.md)에 기록되어 있다.

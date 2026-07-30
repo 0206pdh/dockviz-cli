@@ -299,6 +299,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.selectedID = m.containers[m.cursor].ID
 			m.activeView = ViewDetail
 		}
+		if m.activePanel == PanelProblems && len(m.problems()) > 0 {
+			m.activeView = ViewDetail
+		}
 
 	case keyMatches(msg, km.Delete):
 		// Capture the ID now so auto-refresh can't change it before "y" is pressed.

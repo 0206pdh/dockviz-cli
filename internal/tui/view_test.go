@@ -156,3 +156,30 @@ func TestRenderDetailShowsResourceSummary(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderProblemDetailShowsRecommendation(t *testing.T) {
+	m := Model{
+		activePanel: PanelProblems,
+		activeView:  ViewDetail,
+		containers: []docker.ContainerInfo{
+			{
+				ID:             "abc123",
+				Name:           "api",
+				Status:         "running",
+				CPUPerc:        92,
+				MemMB:          512,
+				LimitsKnown:    true,
+				ComposeProject: "shop",
+				ComposeService: "api",
+			},
+		},
+		history: map[string][]float64{"abc123": []float64{90, 92, 94}},
+	}
+
+	view := m.renderDetail()
+	for _, want := range []string{"Problem Detail", "High CPU", "Recommendation", "shop", "api", "Current CPU"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("renderDetail() missing %q in:\n%s", want, view)
+		}
+	}
+}

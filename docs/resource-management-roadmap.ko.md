@@ -55,12 +55,13 @@
 
 ## Phase 4 — Recommendation Layer
 
-상태: 설계 예정
+상태: 구현 완료
 
 - `High CPU`가 지속되면 CPU limit 설정 여부와 최근 p95를 근거로 추천 문구를 제공한다.
 - `Memory pressure`가 발생하면 current/p95/limit 비율을 근거로 memory limit 조정 또는 leak 확인을 추천한다.
 - `No resource limits`는 compose YAML 예시 형태로 `cpus`, `mem_limit` 후보를 제안한다.
-- 추천은 기본적으로 read-only이며, 사용자가 명시적으로 요청하기 전까지 파일을 수정하지 않는다.
+- Problems 패널에서 `[Enter]`를 누르면 문제 detail과 recommendation을 표시한다.
+- 추천은 read-only이며, 사용자가 명시적으로 요청하기 전까지 파일을 수정하지 않는다.
 
 목적:
 
@@ -68,10 +69,10 @@
 
 ## Phase 5 — Scenario Benchmarks
 
-상태: 설계 예정
+상태: 구현 완료
 
-- CPU hog, memory pressure, memory leak, no-limit service를 재현하는 compose 시나리오를 제공한다.
-- `dockviz`가 문제를 탐지하기까지 걸린 시간과 탐지된 항목을 기록한다.
+- CPU hog, memory pressure, memory growth, no-limit service를 재현하는 시나리오를 제공한다.
+- 시나리오가 sample CSV와 expected problem summary JSON을 기록한다.
 - Docker CLI로 같은 문제를 수동 확인하는 절차와 비교한다.
 
 목적:

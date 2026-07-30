@@ -15,11 +15,12 @@ import (
 // Problem is an actionable condition derived from the Docker event stream.
 // Normal lifecycle events are intentionally omitted from this view.
 type Problem struct {
-	Severity string
-	Kind     string
-	Name     string
-	Detail   string
-	Since    time.Time
+	Severity       string
+	Kind           string
+	Name           string
+	Detail         string
+	Recommendation string
+	Since          time.Time
 }
 
 // problems derives current problems from the recent event window.
@@ -29,11 +30,12 @@ func (m Model) problems() []Problem {
 	var out []Problem
 	if m.eventDisconnected {
 		out = append(out, Problem{
-			Severity: "critical",
-			Kind:     "Daemon disconnected",
-			Name:     "Docker daemon",
-			Detail:   "Event stream stopped; press [r] to reconnect",
-			Since:    time.Now(),
+			Severity:       "critical",
+			Kind:           "Daemon disconnected",
+			Name:           "Docker daemon",
+			Detail:         "Event stream stopped; press [r] to reconnect",
+			Recommendation: "Press [r] to reconnect the event stream. If it repeats, check Docker Desktop or daemon logs.",
+			Since:          time.Now(),
 		})
 	}
 
@@ -54,28 +56,31 @@ func (m Model) problems() []Problem {
 		case "die":
 			if e.OOMKilled {
 				issues[e.ContainerName] = Problem{
-					Severity: "critical",
-					Kind:     "OOM killed",
-					Name:     e.ContainerName,
-					Detail:   "Container was killed by the OOM handler",
-					Since:    e.Time,
+					Severity:       "critical",
+					Kind:           "OOM killed",
+					Name:           e.ContainerName,
+					Detail:         "Container was killed by the OOM handler",
+					Recommendation: "Inspect logs and memory history. If the workload is valid, raise the memory limit; otherwise check for leak or oversized cache.",
+					Since:          e.Time,
 				}
 			} else if e.ExitCode != 0 {
 				issues[e.ContainerName] = Problem{
-					Severity: "critical",
-					Kind:     "Abnormal exit",
-					Name:     e.ContainerName,
-					Detail:   fmt.Sprintf("Container exited with code %d", e.ExitCode),
-					Since:    e.Time,
+					Severity:       "critical",
+					Kind:           "Abnormal exit",
+					Name:           e.ContainerName,
+					Detail:         fmt.Sprintf("Container exited with code %d", e.ExitCode),
+					Recommendation: "Open container logs first. Then inspect recent deploy/config changes and restart policy.",
+					Since:          e.Time,
 				}
 			}
 		case "kill":
 			issues[e.ContainerName] = Problem{
-				Severity: "warning",
-				Kind:     "Killed",
-				Name:     e.ContainerName,
-				Detail:   "Container received a kill signal",
-				Since:    e.Time,
+				Severity:       "warning",
+				Kind:           "Killed",
+				Name:           e.ContainerName,
+				Detail:         "Container received a kill signal",
+				Recommendation: "Check whether this was an operator action, compose down, or host pressure. If unexpected, inspect logs around the kill time.",
+				Since:          e.Time,
 			}
 		case "restart":
 			restarts[e.ContainerName] = append(restarts[e.ContainerName], e.Time)
@@ -88,11 +93,12 @@ func (m Model) problems() []Problem {
 		}
 		latest := times[len(times)-1]
 		issues[name] = Problem{
-			Severity: "warning",
-			Kind:     "Restart loop",
-			Name:     name,
-			Detail:   fmt.Sprintf("Restarted %d times in the last 10 minutes", len(times)),
-			Since:    latest,
+			Severity:       "warning",
+			Kind:           "Restart loop",
+			Name:           name,
+			Detail:         fmt.Sprintf("Restarted %d times in the last 10 minutes", len(times)),
+			Recommendation: "Open logs and check healthcheck/dependency readiness. Avoid increasing restart policy before fixing the failing process.",
+			Since:          latest,
 		}
 	}
 
@@ -121,11 +127,12 @@ func (m Model) resourceProblems() []Problem {
 		if sustainedHighCPU(cpuHistory) {
 			cpu := summarizeResource(cpuHistory)
 			out = append(out, Problem{
-				Severity: "warning",
-				Kind:     "High CPU",
-				Name:     c.Name,
-				Detail:   fmt.Sprintf("avg %s, p95 %s over recent samples", formatPercent(cpu.Avg), formatPercent(cpu.P95)),
-				Since:    now,
+				Severity:       "warning",
+				Kind:           "High CPU",
+				Name:           c.Name,
+				Detail:         fmt.Sprintf("avg %s, p95 %s over recent samples", formatPercent(cpu.Avg), formatPercent(cpu.P95)),
+				Recommendation: "If expected, set or tune a CPU limit. If unexpected, inspect the workload path and compare this container against project top CPU.",
+				Since:          now,
 			})
 		}
 
@@ -133,30 +140,33 @@ func (m Model) resourceProblems() []Problem {
 		if memoryPressure(c, memHistory) {
 			mem := summarizeResource(memHistory)
 			out = append(out, Problem{
-				Severity: "warning",
-				Kind:     "Memory pressure",
-				Name:     c.Name,
-				Detail:   fmt.Sprintf("p95 %s near limit %s", formatMB(mem.P95), formatMB(c.MemoryLimitMB)),
-				Since:    now,
+				Severity:       "warning",
+				Kind:           "Memory pressure",
+				Name:           c.Name,
+				Detail:         fmt.Sprintf("p95 %s near limit %s", formatMB(mem.P95), formatMB(c.MemoryLimitMB)),
+				Recommendation: "Watch for OOM risk. Raise mem_limit only if the working set is expected; otherwise inspect leak/cache growth.",
+				Since:          now,
 			})
 		}
 		if memoryGrowth(memHistory) {
 			mem := summarizeResource(memHistory)
 			out = append(out, Problem{
-				Severity: "warning",
-				Kind:     "Memory growth",
-				Name:     c.Name,
-				Detail:   fmt.Sprintf("trend %s, now %s, peak %s", mem.Trend, formatMB(mem.Current), formatMB(mem.Peak)),
-				Since:    now,
+				Severity:       "warning",
+				Kind:           "Memory growth",
+				Name:           c.Name,
+				Detail:         fmt.Sprintf("trend %s, now %s, peak %s", mem.Trend, formatMB(mem.Current), formatMB(mem.Peak)),
+				Recommendation: "Check for leak, unbounded cache, or queue buildup. Compare memory history before and after the suspected workload.",
+				Since:          now,
 			})
 		}
 		if c.LimitsKnown && c.CPULimit == 0 && c.MemoryLimitMB == 0 {
 			out = append(out, Problem{
-				Severity: "warning",
-				Kind:     "No resource limits",
-				Name:     c.Name,
-				Detail:   "No CPU or memory hard limit configured",
-				Since:    now,
+				Severity:       "warning",
+				Kind:           "No resource limits",
+				Name:           c.Name,
+				Detail:         "No CPU or memory hard limit configured",
+				Recommendation: "Add compose cpus and mem_limit, or run with --cpus and --memory. Start from observed p95 plus headroom.",
+				Since:          now,
 			})
 		}
 	}

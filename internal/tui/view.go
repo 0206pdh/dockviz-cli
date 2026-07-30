@@ -666,6 +666,10 @@ func eventActionStyle(action string) (string, lipgloss.Style) {
 
 // renderDetail shows detailed info for the selected container.
 func (m Model) renderDetail() string {
+	if m.activePanel == PanelProblems {
+		return m.renderProblemDetail()
+	}
+
 	for _, c := range m.containers {
 		if c.ID != m.selectedID {
 			continue
@@ -721,6 +725,68 @@ func (m Model) renderDetail() string {
 		return strings.Join(lines, "\n")
 	}
 	return "\n  Container not found. [Esc] Back\n"
+}
+
+func (m Model) renderProblemDetail() string {
+	problems := m.problems()
+	if len(problems) == 0 {
+		return "\n  Problem not found. [Esc] Back\n"
+	}
+	cursor := clamp(m.cursor, 0, len(problems)-1)
+	p := problems[cursor]
+
+	label := lipgloss.NewStyle().Foreground(ui.ColorGray)
+	value := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+	row := func(k, v string) string {
+		return "  " + label.Render(fmt.Sprintf("%-14s", k)) + " " + value.Render(v)
+	}
+
+	severityStyle := ui.StatusRunning
+	if p.Severity == "critical" {
+		severityStyle = ui.ErrorStyle
+	}
+
+	lines := []string{
+		"\n  " + ui.TitleStyle.Render("Problem Detail"),
+		"",
+		row("Severity", severityStyle.Render(strings.ToUpper(p.Severity))),
+		row("Type", p.Kind),
+		row("Container", p.Name),
+		row("Detail", p.Detail),
+	}
+
+	if c, ok := m.containerByName(p.Name); ok {
+		lines = append(lines,
+			"",
+			row("Project", valueOrDash(c.ComposeProject)),
+			row("Service", valueOrDash(c.ComposeService)),
+			row("Current CPU", formatPercent(c.CPUPerc)),
+			row("Current MEM", formatMB(c.MemMB)),
+			row("Limits", formatLimits(c)),
+		)
+	}
+
+	if p.Recommendation != "" {
+		lines = append(lines, "", row("Recommendation", p.Recommendation))
+	}
+	lines = append(lines, "", "  "+ui.FooterStyle.Render("[Esc] Back"))
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) containerByName(name string) (docker.ContainerInfo, bool) {
+	for _, c := range m.containers {
+		if c.Name == name {
+			return c, true
+		}
+	}
+	return docker.ContainerInfo{}, false
+}
+
+func valueOrDash(v string) string {
+	if v == "" {
+		return "-"
+	}
+	return v
 }
 
 // renderLogs displays the streamed log output for the selected container.

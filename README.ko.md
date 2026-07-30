@@ -120,6 +120,8 @@ history도 함께 평가합니다.
 
 이후 `start` 또는 `unpause` event가 오면 crash/kill 문제는 해결된 것으로
 처리합니다. 최초 event 조회는 최근 1시간, 문제 판정은 최근 10분 기준입니다.
+Problems 패널에서 `[Enter]`를 누르면 문제 상세 정보, 현재 resource context,
+read-only recommendation을 확인할 수 있습니다.
 
 ## Disk Usage 패널
 
@@ -239,9 +241,14 @@ powershell -ExecutionPolicy Bypass -File .\scenarios\run-dockviz-performance.ps1
 [`docs/performance-scenarios.ko.md`](docs/performance-scenarios.ko.md)를 참고한다.
 실제 daemon에서 실행한 검증 결과는
 [`docs/performance-results.ko.md`](docs/performance-results.ko.md)에 정리되어 있다.
+CPU/MEM health 시나리오 smoke 결과는
+[`docs/resource-health-smoke-results.ko.md`](docs/resource-health-smoke-results.ko.md)에 정리되어 있다.
 unused tagged image, dangling image, unused volume, Docker Desktop VHDX
 동작을 실제 daemon에서 검증한 상세 리포트는
 [`docs/reclaim-validation-report.ko.md`](docs/reclaim-validation-report.ko.md)에 정리되어 있다.
+
+CPU/MEM 문제 탐지 전용 시나리오는
+[`scenarios/run-dockviz-resource-health.ps1`](scenarios/run-dockviz-resource-health.ps1)에 있다.
 
 CPU/MEM 관리 기능의 phase 로드맵은
 [`docs/resource-management-roadmap.ko.md`](docs/resource-management-roadmap.ko.md)에 정리되어 있다.

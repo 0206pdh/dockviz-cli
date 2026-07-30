@@ -86,6 +86,9 @@ func TestProblemsDetectResourceIssues(t *testing.T) {
 	for _, p := range problems {
 		if _, ok := wantKinds[p.Kind]; ok {
 			wantKinds[p.Kind] = true
+			if p.Recommendation == "" {
+				t.Fatalf("problem %q has empty recommendation: %+v", p.Kind, p)
+			}
 		}
 	}
 	for kind, seen := range wantKinds {
