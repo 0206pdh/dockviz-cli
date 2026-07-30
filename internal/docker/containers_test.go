@@ -17,12 +17,12 @@ func TestCalcCPUPercent(t *testing.T) {
 			name: "zero delta returns zero",
 			stats: container.StatsResponse{
 				CPUStats: container.CPUStats{
-					CPUUsage:   container.CPUUsage{TotalUsage: 100},
+					CPUUsage:    container.CPUUsage{TotalUsage: 100},
 					SystemUsage: 1000,
 					OnlineCPUs:  2,
 				},
 				PreCPUStats: container.CPUStats{
-					CPUUsage:   container.CPUUsage{TotalUsage: 100},
+					CPUUsage:    container.CPUUsage{TotalUsage: 100},
 					SystemUsage: 1000,
 				},
 			},
@@ -33,12 +33,12 @@ func TestCalcCPUPercent(t *testing.T) {
 			name: "normal 50% load on 2 CPUs",
 			stats: container.StatsResponse{
 				CPUStats: container.CPUStats{
-					CPUUsage:   container.CPUUsage{TotalUsage: 200_000_000},
+					CPUUsage:    container.CPUUsage{TotalUsage: 200_000_000},
 					SystemUsage: 2_000_000_000,
 					OnlineCPUs:  2,
 				},
 				PreCPUStats: container.CPUStats{
-					CPUUsage:   container.CPUUsage{TotalUsage: 100_000_000},
+					CPUUsage:    container.CPUUsage{TotalUsage: 100_000_000},
 					SystemUsage: 1_000_000_000,
 				},
 			},
@@ -50,14 +50,14 @@ func TestCalcCPUPercent(t *testing.T) {
 			stats: container.StatsResponse{
 				CPUStats: container.CPUStats{
 					CPUUsage: container.CPUUsage{
-						TotalUsage:   200_000_000,
-						PercpuUsage:  []uint64{100_000_000, 100_000_000},
+						TotalUsage:  200_000_000,
+						PercpuUsage: []uint64{100_000_000, 100_000_000},
 					},
 					SystemUsage: 2_000_000_000,
 					OnlineCPUs:  0,
 				},
 				PreCPUStats: container.CPUStats{
-					CPUUsage:   container.CPUUsage{TotalUsage: 100_000_000},
+					CPUUsage:    container.CPUUsage{TotalUsage: 100_000_000},
 					SystemUsage: 1_000_000_000,
 				},
 			},
@@ -68,12 +68,12 @@ func TestCalcCPUPercent(t *testing.T) {
 			name: "zero system delta returns zero (avoid division by zero)",
 			stats: container.StatsResponse{
 				CPUStats: container.CPUStats{
-					CPUUsage:   container.CPUUsage{TotalUsage: 200},
+					CPUUsage:    container.CPUUsage{TotalUsage: 200},
 					SystemUsage: 1000,
 					OnlineCPUs:  2,
 				},
 				PreCPUStats: container.CPUStats{
-					CPUUsage:   container.CPUUsage{TotalUsage: 100},
+					CPUUsage:    container.CPUUsage{TotalUsage: 100},
 					SystemUsage: 1000, // same system usage — delta = 0
 				},
 			},
@@ -140,6 +140,43 @@ func TestFormatPorts(t *testing.T) {
 			got := formatPorts(tt.ports)
 			if got != tt.want {
 				t.Errorf("formatPorts() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCPULimitFromHostConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		hc   *container.HostConfig
+		want float64
+	}{
+		{
+			name: "nil host config",
+			hc:   nil,
+			want: 0,
+		},
+		{
+			name: "NanoCPUs",
+			hc:   &container.HostConfig{Resources: container.Resources{NanoCPUs: 1_500_000_000}},
+			want: 1.5,
+		},
+		{
+			name: "quota and period",
+			hc:   &container.HostConfig{Resources: container.Resources{CPUQuota: 50_000, CPUPeriod: 100_000}},
+			want: 0.5,
+		},
+		{
+			name: "windows CPU count fallback",
+			hc:   &container.HostConfig{Resources: container.Resources{CPUCount: 2}},
+			want: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cpuLimitFromHostConfig(tt.hc); got != tt.want {
+				t.Fatalf("cpuLimitFromHostConfig() = %v, want %v", got, tt.want)
 			}
 		})
 	}

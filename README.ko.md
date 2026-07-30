@@ -18,9 +18,9 @@ Docker Engine이나 Docker CLI를 대체하는 범용 명령어 래퍼는 아닙
 
 | 패널 | 목적 |
 |---|---|
-| Containers | CPU/MEM, 상태, 포트, 상세 정보, 로그, 추이 차트 |
+| Containers | CPU/MEM, p95 요약, limit, 상세 정보, 로그, 추이 차트 |
 | Images | 로컬 이미지 태그 조회와 태그/이미지 삭제 |
-| Problems | OOM, 비정상 종료, kill, restart loop, daemon 연결 문제 |
+| Problems | OOM/restart event, high CPU, memory pressure/growth, limit 누락, daemon 연결 문제 |
 | Disk Usage | 이미지·컨테이너·볼륨·build cache·로그 분석과 prune |
 
 Networks, 단순 Events 타임라인, `exec`, 컨테이너 start/stop/restart, 이미지
@@ -105,12 +105,17 @@ dockviz --host tcp://192.168.1.100:2375
 ## Problems 패널
 
 Docker event를 내부적으로 수집하지만 정상적인 `create`, `start` 이벤트는
-숨기고 운영상 의미 있는 문제만 표시합니다.
+숨기고 운영상 의미 있는 문제만 표시합니다. Containers 패널의 최근 CPU/MEM
+history도 함께 평가합니다.
 
 - **OOM killed** — OOM handler에 의해 컨테이너가 종료됨;
 - **Abnormal exit** — `die` event의 exit code가 0이 아님;
 - **Killed** — 컨테이너가 kill signal을 받음;
 - **Restart loop** — 10분 안에 세 번 이상 restart됨;
+- **High CPU** — 최근 CPU sample이 지속적으로 높음;
+- **Memory pressure** — memory p95/current가 configured memory limit에 근접함;
+- **Memory growth** — 최근 memory sample이 의미 있게 증가 추세임;
+- **No resource limits** — 실행 중인 컨테이너에 CPU/MEM hard limit이 없음;
 - **Daemon disconnected** — Docker event stream이 끊김.
 
 이후 `start` 또는 `unpause` event가 오면 crash/kill 문제는 해결된 것으로
@@ -237,6 +242,9 @@ powershell -ExecutionPolicy Bypass -File .\scenarios\run-dockviz-performance.ps1
 unused tagged image, dangling image, unused volume, Docker Desktop VHDX
 동작을 실제 daemon에서 검증한 상세 리포트는
 [`docs/reclaim-validation-report.ko.md`](docs/reclaim-validation-report.ko.md)에 정리되어 있다.
+
+CPU/MEM 관리 기능의 phase 로드맵은
+[`docs/resource-management-roadmap.ko.md`](docs/resource-management-roadmap.ko.md)에 정리되어 있다.
 
 ## License
 

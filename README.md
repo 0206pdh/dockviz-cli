@@ -32,6 +32,7 @@ The Docker CLI is excellent for individual commands. `dockviz` is useful when
 you need a compact, continuously updating view of several resources at once:
 
 - container CPU, memory, status, ports, logs, and recent history;
+- resource summaries with current, p95, peak/trend detail, and CPU/MEM limits;
 - actionable problems derived from Docker events;
 - image, stopped-container, volume, build-cache, and container-log usage;
 - confirmation-gated cleanup actions with the reported reclaimed space.
@@ -42,9 +43,9 @@ The dashboard has four panels:
 
 | Panel | Purpose |
 |---|---|
-| Containers | Live CPU/MEM, status, ports, detail, logs, and history chart |
+| Containers | Live CPU/MEM, p95 summaries, limits, detail, logs, and history chart |
 | Images | Local image tags and safe tag/image removal |
-| Problems | OOM kills, abnormal exits, kill signals, restart loops, and daemon disconnects |
+| Problems | OOM/restart events, high CPU, memory pressure/growth, missing limits, and daemon disconnects |
 | Disk Usage | Docker storage breakdown and category-level prune actions |
 
 The former Networks, Events timeline, `exec`, container lifecycle controls, and
@@ -184,16 +185,23 @@ An example daemon measurement is recorded in
 An additional reclaim validation report, focused on unused tagged images,
 dangling images, unused volumes, and Docker Desktop VHDX behavior, is recorded
 in [`docs/reclaim-validation-report.ko.md`](docs/reclaim-validation-report.ko.md).
+The CPU/MEM feature roadmap is documented in
+[`docs/resource-management-roadmap.ko.md`](docs/resource-management-roadmap.ko.md).
 
 ## Problems panel
 
 The Problems panel keeps the Docker event stream internally but hides normal
-noise such as ordinary `create` and `start` events. It currently reports:
+noise such as ordinary `create` and `start` events. It also evaluates recent
+CPU/MEM history from the Containers panel. It currently reports:
 
 - **OOM killed** — Docker reports that the container was killed by the OOM handler;
 - **Abnormal exit** — a `die` event has a non-zero exit code;
 - **Killed** — the container received a kill signal;
 - **Restart loop** — at least three restart events occurred in ten minutes;
+- **High CPU** — recent CPU samples stayed high;
+- **Memory pressure** — memory p95/current is near the configured memory limit;
+- **Memory growth** — recent memory samples trend upward materially;
+- **No resource limits** — a running container has neither CPU nor memory hard limits;
 - **Daemon disconnected** — the event stream was interrupted.
 
 A later `start` or `unpause` event clears a crash/kill problem for that

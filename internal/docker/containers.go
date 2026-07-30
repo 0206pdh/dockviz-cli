@@ -12,14 +12,17 @@ import (
 
 // ContainerInfo holds the data shown in the TUI list.
 type ContainerInfo struct {
-	ID      string
-	Name    string
-	Image   string
-	Status  string   // "running", "stopped", "paused", etc.
-	CPUPerc float64  // percentage 0-100
-	MemMB   float64  // megabytes
-	Ports   string   // human-readable port bindings
-	Volumes []string // mount points, e.g. ["/host/path → /ctr/path", "vol → /data:ro"]
+	ID            string
+	Name          string
+	Image         string
+	Status        string  // "running", "stopped", "paused", etc.
+	CPUPerc       float64 // percentage 0-100
+	MemMB         float64 // megabytes
+	CPULimit      float64
+	MemoryLimitMB float64
+	LimitsKnown   bool
+	Ports         string   // human-readable port bindings
+	Volumes       []string // mount points, e.g. ["/host/path → /ctr/path", "vol → /data:ro"]
 }
 
 // ListContainers returns all containers (running + stopped).
@@ -30,11 +33,14 @@ func (c *Client) ListContainers() ([]ContainerInfo, error) {
 	}
 
 	result := make([]ContainerInfo, 0, len(containers))
+	currentIDs := make(map[string]bool, len(containers))
 	for _, ctr := range containers {
+		currentIDs[ctr.ID] = true
 		name := ""
 		if len(ctr.Names) > 0 {
 			name = ctr.Names[0][1:] // strip leading "/"
 		}
+		cpuLimit, memLimit, limitsKnown := c.containerResourceLimits(ctr.ID)
 		var vols []string
 		for _, m := range ctr.Mounts {
 			src := m.Source
@@ -48,14 +54,18 @@ func (c *Client) ListContainers() ([]ContainerInfo, error) {
 			vols = append(vols, entry)
 		}
 		result = append(result, ContainerInfo{
-			ID:      ctr.ID[:12],
-			Name:    name,
-			Image:   ctr.Image,
-			Status:  ctr.State,
-			Ports:   formatPorts(ctr.Ports),
-			Volumes: vols,
+			ID:            ctr.ID[:12],
+			Name:          name,
+			Image:         ctr.Image,
+			Status:        ctr.State,
+			CPULimit:      cpuLimit,
+			MemoryLimitMB: memLimit,
+			LimitsKnown:   limitsKnown,
+			Ports:         formatPorts(ctr.Ports),
+			Volumes:       vols,
 		})
 	}
+	c.pruneResourceLimitCache(currentIDs)
 	return result, nil
 }
 
@@ -126,4 +136,56 @@ func formatPorts(ports []container.Port) string {
 		}
 	}
 	return out
+}
+
+func (c *Client) containerResourceLimits(id string) (cpuLimit float64, memoryLimitMB float64, known bool) {
+	c.resourceLimitsMu.Lock()
+	if cached, ok := c.resourceLimitsByID[id]; ok {
+		c.resourceLimitsMu.Unlock()
+		return cached.cpuLimit, cached.memoryLimitMB, cached.known
+	}
+	c.resourceLimitsMu.Unlock()
+
+	inspect, err := c.cli.ContainerInspect(c.ctx, id)
+	if err != nil || inspect.HostConfig == nil {
+		return 0, 0, false
+	}
+	hc := inspect.HostConfig
+	cpuLimit = cpuLimitFromHostConfig(hc)
+	if hc.Memory > 0 {
+		memoryLimitMB = float64(hc.Memory) / 1024 / 1024
+	}
+	c.resourceLimitsMu.Lock()
+	if c.resourceLimitsByID == nil {
+		c.resourceLimitsByID = make(map[string]resourceLimits)
+	}
+	c.resourceLimitsByID[id] = resourceLimits{cpuLimit: cpuLimit, memoryLimitMB: memoryLimitMB, known: true}
+	c.resourceLimitsMu.Unlock()
+	return cpuLimit, memoryLimitMB, true
+}
+
+func (c *Client) pruneResourceLimitCache(currentIDs map[string]bool) {
+	c.resourceLimitsMu.Lock()
+	defer c.resourceLimitsMu.Unlock()
+	for id := range c.resourceLimitsByID {
+		if !currentIDs[id] {
+			delete(c.resourceLimitsByID, id)
+		}
+	}
+}
+
+func cpuLimitFromHostConfig(hc *container.HostConfig) float64 {
+	if hc == nil {
+		return 0
+	}
+	switch {
+	case hc.NanoCPUs > 0:
+		return float64(hc.NanoCPUs) / 1e9
+	case hc.CPUPeriod > 0 && hc.CPUQuota > 0:
+		return float64(hc.CPUQuota) / float64(hc.CPUPeriod)
+	case hc.CPUCount > 0:
+		return float64(hc.CPUCount)
+	default:
+		return 0
+	}
 }

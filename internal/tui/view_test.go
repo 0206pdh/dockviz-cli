@@ -97,3 +97,58 @@ func TestHostStorageOutsideDockerDF(t *testing.T) {
 		t.Fatalf("hostStorageOutsideDockerDF() = %v, want 0 when Docker df accounts for more than host allocation", got)
 	}
 }
+
+func TestRenderContainersShowsResourceSummaries(t *testing.T) {
+	m := Model{
+		containers: []docker.ContainerInfo{
+			{
+				ID:            "abc123",
+				Name:          "api",
+				Status:        "running",
+				CPUPerc:       40,
+				MemMB:         512,
+				CPULimit:      1.5,
+				MemoryLimitMB: 2048,
+				LimitsKnown:   true,
+			},
+		},
+		history:    map[string][]float64{"abc123": []float64{10, 20, 40}},
+		memHistory: map[string][]float64{"abc123": []float64{256, 512, 1024}},
+	}
+
+	view := m.renderContainers()
+	for _, want := range []string{"CPU95", "MEM95", "LIMITS", "40.0%", "1.0GB", "CPU:1.5 MEM:2"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("renderContainers() missing %q in:\n%s", want, view)
+		}
+	}
+}
+
+func TestRenderDetailShowsResourceSummary(t *testing.T) {
+	m := Model{
+		selectedID: "abc123",
+		containers: []docker.ContainerInfo{
+			{
+				ID:            "abc123",
+				Name:          "api",
+				Image:         "my-api:latest",
+				Status:        "running",
+				CPUPerc:       40,
+				MemMB:         512,
+				CPULimit:      1,
+				MemoryLimitMB: 1024,
+				LimitsKnown:   true,
+				Ports:         "8080:80",
+			},
+		},
+		history:    map[string][]float64{"abc123": []float64{10, 20, 40}},
+		memHistory: map[string][]float64{"abc123": []float64{256, 512, 768}},
+	}
+
+	view := m.renderDetail()
+	for _, want := range []string{"CPU", "Memory", "avg", "p95", "peak", "trend", "Limits"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("renderDetail() missing %q in:\n%s", want, view)
+		}
+	}
+}

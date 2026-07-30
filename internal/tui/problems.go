@@ -2,10 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/0206pdh/dockviz-cli/internal/docker"
 	"github.com/0206pdh/dockviz-cli/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -97,6 +99,7 @@ func (m Model) problems() []Problem {
 	for _, p := range issues {
 		out = append(out, p)
 	}
+	out = append(out, m.resourceProblems()...)
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Severity != out[j].Severity {
 			return out[i].Severity == "critical"
@@ -104,6 +107,92 @@ func (m Model) problems() []Problem {
 		return out[i].Since.After(out[j].Since)
 	})
 	return out
+}
+
+func (m Model) resourceProblems() []Problem {
+	var out []Problem
+	now := time.Now()
+	for _, c := range m.containers {
+		if c.Status != "running" {
+			continue
+		}
+
+		cpuHistory := m.history[c.ID]
+		if sustainedHighCPU(cpuHistory) {
+			cpu := summarizeResource(cpuHistory)
+			out = append(out, Problem{
+				Severity: "warning",
+				Kind:     "High CPU",
+				Name:     c.Name,
+				Detail:   fmt.Sprintf("avg %s, p95 %s over recent samples", formatPercent(cpu.Avg), formatPercent(cpu.P95)),
+				Since:    now,
+			})
+		}
+
+		memHistory := m.memHistory[c.ID]
+		if memoryPressure(c, memHistory) {
+			mem := summarizeResource(memHistory)
+			out = append(out, Problem{
+				Severity: "warning",
+				Kind:     "Memory pressure",
+				Name:     c.Name,
+				Detail:   fmt.Sprintf("p95 %s near limit %s", formatMB(mem.P95), formatMB(c.MemoryLimitMB)),
+				Since:    now,
+			})
+		}
+		if memoryGrowth(memHistory) {
+			mem := summarizeResource(memHistory)
+			out = append(out, Problem{
+				Severity: "warning",
+				Kind:     "Memory growth",
+				Name:     c.Name,
+				Detail:   fmt.Sprintf("trend %s, now %s, peak %s", mem.Trend, formatMB(mem.Current), formatMB(mem.Peak)),
+				Since:    now,
+			})
+		}
+		if c.LimitsKnown && c.CPULimit == 0 && c.MemoryLimitMB == 0 {
+			out = append(out, Problem{
+				Severity: "warning",
+				Kind:     "No resource limits",
+				Name:     c.Name,
+				Detail:   "No CPU or memory hard limit configured",
+				Since:    now,
+			})
+		}
+	}
+	return out
+}
+
+func sustainedHighCPU(values []float64) bool {
+	if len(values) < 3 {
+		return false
+	}
+	recent := lastValues(values, 5)
+	return mean(recent) >= 80
+}
+
+func memoryPressure(c docker.ContainerInfo, values []float64) bool {
+	if c.MemoryLimitMB <= 0 || len(values) == 0 {
+		return false
+	}
+	mem := summarizeResource(values)
+	return math.Max(mem.Current, mem.P95)/c.MemoryLimitMB >= 0.8
+}
+
+func memoryGrowth(values []float64) bool {
+	if len(values) < 6 || resourceTrend(values) != "up" {
+		return false
+	}
+	delta := values[len(values)-1] - values[0]
+	threshold := math.Max(50, values[0]*0.2)
+	return delta >= threshold
+}
+
+func lastValues(values []float64, max int) []float64 {
+	if len(values) <= max {
+		return values
+	}
+	return values[len(values)-max:]
 }
 
 func (m Model) renderProblems() string {
@@ -133,9 +222,9 @@ func (m Model) renderProblems() string {
 	}
 
 	if len(problems) == 0 {
-		rows = append(rows, "\n  "+lipgloss.NewStyle().Foreground(ui.ColorGreen).Render("✓ No active problems"))
+		rows = append(rows, "\n  "+lipgloss.NewStyle().Foreground(ui.ColorGreen).Render("No active problems"))
 	} else {
-		rows = append(rows, fmt.Sprintf("\n  %d active problem(s) · source: Docker events", len(problems)))
+		rows = append(rows, fmt.Sprintf("\n  %d active problem(s) - source: Docker events + resource history", len(problems)))
 	}
 	return strings.Join(rows, "\n")
 }

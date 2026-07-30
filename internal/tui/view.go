@@ -172,14 +172,11 @@ func (m Model) renderActivePanel() string {
 }
 
 // renderContainers builds the container list table.
-// Column widths (display chars): cursor=2 | NAME=20 | GRAPH=10 | CPU=8 | MEM=8 | STATUS=12 | PORTS=18
-// ANSI-coloured columns (GRAPH, STATUS) are pre-padded to their target width BEFORE
-// wrapping in a colour style, so fmt.Sprintf sees only the plain-text width.
 func (m Model) renderContainers() string {
 	// Header prefix is 2 spaces to match the 2-char cursor field in each row.
 	header := ui.HeaderStyle.Render(
-		fmt.Sprintf("  %-20s %-10s %-8s %-8s %-12s %-18s",
-			"NAME", "GRAPH", "CPU", "MEM", "STATUS", "PORTS"),
+		fmt.Sprintf("  %-18s %-10s %-7s %-7s %-8s %-8s %-14s %-12s",
+			"NAME", "GRAPH", "CPU", "CPU95", "MEM", "MEM95", "LIMITS", "STATUS"),
 	)
 
 	var rows []string
@@ -192,10 +189,18 @@ func (m Model) renderContainers() string {
 		}
 
 		cpu := "-"
+		cpuP95 := "-"
 		mem := "-"
+		memP95 := "-"
 		if c.Status == "running" {
-			cpu = fmt.Sprintf("%.1f%%", c.CPUPerc)
-			mem = fmt.Sprintf("%.0fMB", c.MemMB)
+			cpu = formatPercent(c.CPUPerc)
+			mem = formatMB(c.MemMB)
+			if h := m.history[c.ID]; len(h) > 0 {
+				cpuP95 = formatPercent(summarizeResource(h).P95)
+			}
+			if mh := m.memHistory[c.ID]; len(mh) > 0 {
+				memP95 = formatMB(summarizeResource(mh).P95)
+			}
 		}
 
 		// Sparkline shows the last 10 readings. History stores up to 60 for the chart.
@@ -217,14 +222,16 @@ func (m Model) renderContainers() string {
 		statusStr := ui.StatusStyle(c.Status).Render(statusText)
 
 		// Use %s (no width) for pre-padded ANSI columns; %-Ns for plain-text columns.
-		row := fmt.Sprintf("%s%-20s %s %-8s %-8s %s %-18s",
+		row := fmt.Sprintf("%s%-18s %s %-7s %-7s %-8s %-8s %-14s %s",
 			cursor,
-			truncate(c.Name, 20),
-			sparkStr,  // 10 wide, pre-padded
-			cpu,       // %-8s
-			mem,       // %-8s
+			truncate(c.Name, 18),
+			sparkStr, // 10 wide, pre-padded
+			cpu,
+			cpuP95,
+			mem,
+			memP95,
+			truncate(formatLimits(c), 14),
 			statusStr, // 12 wide, pre-padded
-			truncate(c.Ports, 18),
 		)
 
 		if i == m.cursor {
@@ -639,6 +646,19 @@ func (m Model) renderDetail() string {
 			row("Status", ui.StatusStyle(c.Status).Render(ui.StatusIcon(c.Status)+" "+c.Status)),
 			row("Ports", c.Ports),
 		}
+
+		if c.Status == "running" {
+			cpu := summarizeResource(m.history[c.ID])
+			mem := summarizeResource(m.memHistory[c.ID])
+			lines = append(lines,
+				"",
+				row("CPU", fmt.Sprintf("now %s  avg %s  p95 %s  peak %s  trend %s",
+					formatPercent(c.CPUPerc), formatPercent(cpu.Avg), formatPercent(cpu.P95), formatPercent(cpu.Peak), cpu.Trend)),
+				row("Memory", fmt.Sprintf("now %s  avg %s  p95 %s  peak %s  trend %s",
+					formatMB(c.MemMB), formatMB(mem.Avg), formatMB(mem.P95), formatMB(mem.Peak), mem.Trend)),
+			)
+		}
+		lines = append(lines, row("Limits", formatLimits(c)))
 
 		if len(c.Volumes) > 0 {
 			lines = append(lines, row("Volumes", c.Volumes[0]))

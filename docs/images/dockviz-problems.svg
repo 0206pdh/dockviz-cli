@@ -7,6 +7,8 @@
   <text x="26" y="108" class="mono blue">SEVERITY</text><text x="125" y="108" class="mono blue">TYPE</text><text x="315" y="108" class="mono blue">CONTAINER</text><text x="512" y="108" class="mono blue">DETAIL</text>
   <rect x="8" y="114" width="558" height="21" fill="#4aa3ff"/>
   <text x="25" y="130" class="mono" fill="#000">WARNING</text><text x="96" y="130" class="mono" fill="#000">Killed</text><text x="288" y="130" class="mono" fill="#000">postgres-db</text><text x="476" y="130" class="mono" fill="#000">Container received a kill signal</text>
-  <text x="26" y="176" class="mono">1 active problem(s) • source: Docker events</text>
-  <text x="16" y="222" class="mono dim">[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [r] Refresh</text><text x="16" y="244" class="mono dim">[Enter] inspect  •  live problem detection</text>
+  <text x="25" y="152" class="mono">WARNING</text><text x="96" y="152" class="mono">High CPU</text><text x="288" y="152" class="mono">worker</text><text x="476" y="152" class="mono">avg 91.5%, p95 98.4%</text>
+  <text x="25" y="174" class="mono">WARNING</text><text x="96" y="174" class="mono">No resource limits</text><text x="288" y="174" class="mono">api-server</text><text x="476" y="174" class="mono">No CPU or memory limit</text>
+  <text x="26" y="206" class="mono">3 active problem(s) • source: Docker events + resource history</text>
+  <text x="16" y="246" class="mono dim">[q] Quit  [Tab] Switch Panel  [↑↓] Navigate  [r] Refresh</text><text x="16" y="268" class="mono dim">[Enter] inspect  •  live problem detection</text>
 </svg>

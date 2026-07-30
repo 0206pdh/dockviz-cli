@@ -6,15 +6,24 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/docker/docker/client"
 )
 
 // Client wraps the Docker SDK client with a shared context.
 type Client struct {
-	cli        *client.Client
-	ctx        context.Context
-	daemonHost string
+	cli                *client.Client
+	ctx                context.Context
+	daemonHost         string
+	resourceLimitsMu   sync.Mutex
+	resourceLimitsByID map[string]resourceLimits
+}
+
+type resourceLimits struct {
+	cpuLimit      float64
+	memoryLimitMB float64
+	known         bool
 }
 
 // NewClient creates and validates a connection to the Docker daemon.
@@ -45,7 +54,12 @@ func NewClient(host string) (*Client, error) {
 		return nil, fmt.Errorf("cannot reach Docker daemon — is Docker running? %w", err)
 	}
 
-	return &Client{cli: cli, ctx: ctx, daemonHost: effectiveHost}, nil
+	return &Client{
+		cli:                cli,
+		ctx:                ctx,
+		daemonHost:         effectiveHost,
+		resourceLimitsByID: make(map[string]resourceLimits),
+	}, nil
 }
 
 // Close releases the underlying HTTP connection.

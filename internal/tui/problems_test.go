@@ -43,3 +43,54 @@ func TestProblemsReportsDisconnectedDaemon(t *testing.T) {
 		t.Fatalf("problems() = %+v, want daemon-disconnected problem", problems)
 	}
 }
+
+func TestProblemsDetectResourceIssues(t *testing.T) {
+	m := Model{
+		containers: []docker.ContainerInfo{
+			{
+				ID:          "cpu",
+				Name:        "cpu-hog",
+				Status:      "running",
+				LimitsKnown: true,
+				CPULimit:    1,
+			},
+			{
+				ID:            "mem",
+				Name:          "mem-pressure",
+				Status:        "running",
+				LimitsKnown:   true,
+				MemoryLimitMB: 100,
+			},
+			{
+				ID:          "nolimit",
+				Name:        "nolimit-api",
+				Status:      "running",
+				LimitsKnown: true,
+			},
+		},
+		history: map[string][]float64{
+			"cpu": []float64{90, 95, 91, 93},
+		},
+		memHistory: map[string][]float64{
+			"mem": []float64{40, 55, 70, 85, 105, 120},
+		},
+	}
+
+	problems := m.problems()
+	wantKinds := map[string]bool{
+		"High CPU":           false,
+		"Memory pressure":    false,
+		"Memory growth":      false,
+		"No resource limits": false,
+	}
+	for _, p := range problems {
+		if _, ok := wantKinds[p.Kind]; ok {
+			wantKinds[p.Kind] = true
+		}
+	}
+	for kind, seen := range wantKinds {
+		if !seen {
+			t.Fatalf("missing problem kind %q in %+v", kind, problems)
+		}
+	}
+}
