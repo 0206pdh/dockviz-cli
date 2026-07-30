@@ -35,7 +35,7 @@ codex-smoke-dockviz-health-20260730042422
 예상 dockviz 확인 지점:
 
 - Containers 패널 상단에 project resource summary가 표시된다.
-- Problems 패널에 `High CPU`, `Memory pressure`, `Memory growth`,
+- Problems 패널에 `High CPU` 또는 `CPU saturated`, `Memory pressure` 또는 `Memory over limit`, `Memory growth`,
   `No resource limits`가 표시된다.
 - Problems 패널에서 `[Enter]`를 누르면 detail과 read-only recommendation이 표시된다.
 

@@ -110,17 +110,34 @@ dockviz --host tcp://192.168.1.100:2375
 
 Docker event를 내부적으로 수집하지만 정상적인 `create`, `start` 이벤트는
 숨기고 운영상 의미 있는 문제만 표시합니다. Containers 패널의 최근 CPU/MEM
-history도 함께 평가합니다.
+history와, 로드된 경우 Disk Usage storage offender도 함께 평가합니다.
+severity는 색상이 아니라 조치 우선순위입니다.
 
 - **OOM killed** — OOM handler에 의해 컨테이너가 종료됨;
 - **Abnormal exit** — `die` event의 exit code가 0이 아님;
 - **Killed** — 컨테이너가 kill signal을 받음;
 - **Restart loop** — 10분 안에 세 번 이상 restart됨;
-- **High CPU** — 최근 CPU sample이 지속적으로 높음;
-- **Memory pressure** — memory p95/current가 configured memory limit에 근접함;
-- **Memory growth** — 최근 memory sample이 의미 있게 증가 추세임;
+- **CPU saturated / High CPU / Elevated CPU** — 최근 CPU sample 수준에 따라 critical, warning, info로 분류됨;
+- **Memory over limit / Memory pressure** — memory p95/current가 configured memory limit을 초과하거나 근접함;
+- **Memory growth** — 최근 memory sample이 의미 있게 증가 추세이며 limit에 가까우면 critical로 분류됨;
 - **No resource limits** — 실행 중인 컨테이너에 CPU/MEM hard limit이 없음;
+- **Idle memory** — CPU는 거의 쓰지 않지만 memory를 크게 잡고 있음;
+- **Noisy neighbor** — 한 컨테이너가 project CPU 대부분을 점유함;
+- **Storage offenders** — 큰 로그, build cache, unused image, stopped-container layer, unattached volume, Docker Desktop host-storage gap;
 - **Daemon disconnected** — Docker event stream이 끊김.
+
+현재 threshold:
+
+| Signal | Info | Warning | Critical |
+|---|---:|---:|---:|
+| CPU recent average | >=60% | >=80% | >=95% |
+| Memory / limit | >=60% | >=80% | >=100% |
+| Logs reclaimable | >=100 MB | >=500 MB | >=2 GB |
+| Build cache reclaimable | >=500 MB | >=2 GB | - |
+| Unused tagged/dangling images | >=100 MB | >=1 GB | - |
+| Stopped container writable layers | >=500 MB | >=2 GB | - |
+| Unattached volumes | >=100 MB | >=1 GB | - |
+| Docker Desktop host-storage gap | >=1 GB | >=10 GB | - |
 
 이후 `start` 또는 `unpause` event가 오면 crash/kill 문제는 해결된 것으로
 처리합니다. 최초 event 조회는 최근 1시간, 문제 판정은 최근 10분 기준입니다.

@@ -29,15 +29,18 @@
 상태: 구현 완료
 
 - Problems 패널이 Docker event뿐 아니라 CPU/MEM history도 평가한다.
-- 최근 CPU sample이 지속적으로 높은 컨테이너를 `High CPU`로 표시한다.
-- memory current/p95가 configured memory limit에 가까우면 `Memory pressure`로 표시한다.
-- memory sample이 의미 있게 증가하면 `Memory growth`로 표시한다.
-- running 컨테이너에 CPU/MEM hard limit이 전혀 없으면 `No resource limits`로 표시한다.
+- 최근 CPU sample을 `Elevated CPU`, `High CPU`, `CPU saturated`로 단계화한다.
+- memory current/p95가 configured memory limit에 가까우면 `Memory pressure`, 초과하면 `Memory over limit`로 표시한다.
+- memory sample이 의미 있게 증가하면 `Memory growth`로 표시하고 limit에 가까우면 critical로 올린다.
+- running 컨테이너에 CPU/MEM hard limit이 전혀 없으면 사용량에 따라 `Info` 또는 `Warning`으로 표시한다.
+- CPU는 거의 쓰지 않지만 memory를 크게 잡는 `Idle memory`를 표시한다.
+- compose project 안에서 한 컨테이너가 CPU 대부분을 점유하면 `Noisy neighbor`로 표시한다.
+- Disk Usage가 로드되면 large logs, build cache, unused images, stopped-container layers, unattached volumes, Docker Desktop host-storage gap도 Problems에 올린다.
 
 목적:
 
 - 사용자가 직접 `docker stats`, `docker inspect`, event 로그를 번갈아 보지 않아도
-  위험 컨테이너를 한 패널에서 찾게 한다.
+  위험 컨테이너와 storage offender를 한 패널에서 우선순위대로 찾게 한다.
 
 ## Phase 3 — Compose/Project Resource View
 

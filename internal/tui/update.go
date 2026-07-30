@@ -40,7 +40,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(fetchDataCmd(m.docker), tickCmd())
 
 	case diskUsageRefreshMsg:
-		if m.activePanel != PanelDiskUsage {
+		if m.activePanel != PanelDiskUsage && m.activePanel != PanelProblems {
 			return m, nil
 		}
 		return m, tea.Batch(fetchDiskUsageCmd(m.docker), diskUsageRefreshCmd())
@@ -267,7 +267,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.activePanel = (m.activePanel + 1) % panelCount
 		m.cursor = 0
 		// Event streaming is started in newModel/Init, so no lazy-start needed here.
-		if m.activePanel == PanelDiskUsage {
+		if m.activePanel == PanelDiskUsage || m.activePanel == PanelProblems {
 			m.pruneResultMsg = ""
 			m.diskUsageErr = nil
 			return m, tea.Batch(fetchDiskUsageCmd(m.docker), diskUsageRefreshCmd())
@@ -286,7 +286,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.eventDisconnected = false
 			return m, tea.Batch(fetchDataCmd(m.docker), waitForEventCmd(m.eventCh))
 		}
-		if m.activePanel == PanelDiskUsage {
+		if m.activePanel == PanelDiskUsage || m.activePanel == PanelProblems {
 			return m, fetchDiskUsageCmd(m.docker)
 		}
 		return m, fetchDataCmd(m.docker)

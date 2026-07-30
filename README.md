@@ -203,17 +203,34 @@ The CPU/MEM feature roadmap is documented in
 
 The Problems panel keeps the Docker event stream internally but hides normal
 noise such as ordinary `create` and `start` events. It also evaluates recent
-CPU/MEM history from the Containers panel. It currently reports:
+CPU/MEM history from the Containers panel and, once loaded, Disk Usage storage
+offenders. Severity is used as an action priority:
 
 - **OOM killed** — Docker reports that the container was killed by the OOM handler;
 - **Abnormal exit** — a `die` event has a non-zero exit code;
 - **Killed** — the container received a kill signal;
 - **Restart loop** — at least three restart events occurred in ten minutes;
-- **High CPU** — recent CPU samples stayed high;
-- **Memory pressure** — memory p95/current is near the configured memory limit;
-- **Memory growth** — recent memory samples trend upward materially;
+- **CPU saturated / High CPU / Elevated CPU** — recent CPU samples stayed high enough for critical, warning, or info classification;
+- **Memory over limit / Memory pressure** — memory p95/current is over or near the configured memory limit;
+- **Memory growth** — recent memory samples trend upward materially, critical if growth is close to the limit;
 - **No resource limits** — a running container has neither CPU nor memory hard limits;
+- **Idle memory** — a container holds significant memory while CPU stays idle;
+- **Noisy neighbor** — one container dominates project CPU;
+- **Storage offenders** — large logs, build cache, unused images, stopped-container layers, unattached volumes, or Docker Desktop host-storage gap;
 - **Daemon disconnected** — the event stream was interrupted.
+
+Current severity thresholds:
+
+| Signal | Info | Warning | Critical |
+|---|---:|---:|---:|
+| CPU recent average | >=60% | >=80% | >=95% |
+| Memory / limit | >=60% | >=80% | >=100% |
+| Logs reclaimable | >=100 MB | >=500 MB | >=2 GB |
+| Build cache reclaimable | >=500 MB | >=2 GB | - |
+| Unused tagged/dangling images | >=100 MB | >=1 GB | - |
+| Stopped container writable layers | >=500 MB | >=2 GB | - |
+| Unattached volumes | >=100 MB | >=1 GB | - |
+| Docker Desktop host-storage gap | >=1 GB | >=10 GB | - |
 
 A later `start` or `unpause` event clears a crash/kill problem for that
 container. The initial event query covers the previous hour, while problem

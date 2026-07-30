@@ -741,15 +741,10 @@ func (m Model) renderProblemDetail() string {
 		return "  " + label.Render(fmt.Sprintf("%-14s", k)) + " " + value.Render(v)
 	}
 
-	severityStyle := ui.StatusRunning
-	if p.Severity == "critical" {
-		severityStyle = ui.ErrorStyle
-	}
-
 	lines := []string{
 		"\n  " + ui.TitleStyle.Render("Problem Detail"),
 		"",
-		row("Severity", severityStyle.Render(strings.ToUpper(p.Severity))),
+		row("Severity", problemSeverityStyle(p.Severity).Render(strings.ToUpper(p.Severity))),
 		row("Type", p.Kind),
 		row("Container", p.Name),
 		row("Detail", p.Detail),
