@@ -1,5 +1,7 @@
 # dockviz-cli
 
+> 대용량 실제 daemon 검증 리포트: [docs/core-fixes-validation-report.ko.md](docs/core-fixes-validation-report.ko.md)
+
 **Docker 문제와 디스크 정리를 위한 터미널 대시보드**
 
 [English documentation](README.md) · [Latest releases](https://github.com/0206pdh/dockviz-cli/releases/latest)

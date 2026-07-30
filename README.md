@@ -38,6 +38,27 @@ you need a compact, continuously updating view of several resources at once:
 - image, stopped-container, volume, build-cache, and container-log usage;
 - confirmation-gated cleanup actions with the reported reclaimed space.
 
+## Validation evidence
+
+The core cleanup/resource changes are backed by a real Docker Desktop WSL2
+validation scenario, not only mocks. The latest recorded run created two 4GiB
+named volumes, a 768MiB test image layer, and 12 live stats containers.
+
+Measured results from `dockviz-core-20260730142414`:
+
+- `docker volume prune` without `--all` reclaimed `0B` from labelled named
+  volumes, while `docker volume prune --all` reclaimed `8.59GB`;
+- deleting one image tag from an 813MB multi-tag image removed only the selected
+  tag and preserved the other tag/layers;
+- Go SDK stats collection across 12 containers improved from `19.730s`
+  sequential average to `2.058s` parallel average, a `9.585x` speedup;
+- Docker Desktop `docker_data.vhdx` remained a separate host-storage allocation,
+  confirming why dockviz reports it separately from Docker reclaimable space;
+- a remaining `806.1MB` BuildKit cache was cleaned with build-cache prune,
+  showing why image cleanup and build-cache cleanup must stay separate.
+
+Full report: [docs/core-fixes-validation-report.ko.md](docs/core-fixes-validation-report.ko.md)
+
 ## Dashboard panels
 
 The dashboard has four panels:
