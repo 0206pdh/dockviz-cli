@@ -102,14 +102,16 @@ func TestRenderContainersShowsResourceSummaries(t *testing.T) {
 	m := Model{
 		containers: []docker.ContainerInfo{
 			{
-				ID:            "abc123",
-				Name:          "api",
-				Status:        "running",
-				CPUPerc:       40,
-				MemMB:         512,
-				CPULimit:      1.5,
-				MemoryLimitMB: 2048,
-				LimitsKnown:   true,
+				ID:             "abc123",
+				Name:           "api",
+				Status:         "running",
+				CPUPerc:        40,
+				MemMB:          512,
+				CPULimit:       1.5,
+				MemoryLimitMB:  2048,
+				LimitsKnown:    true,
+				ComposeProject: "shop",
+				ComposeService: "api",
 			},
 		},
 		history:    map[string][]float64{"abc123": []float64{10, 20, 40}},
@@ -117,7 +119,7 @@ func TestRenderContainersShowsResourceSummaries(t *testing.T) {
 	}
 
 	view := m.renderContainers()
-	for _, want := range []string{"CPU95", "MEM95", "LIMITS", "40.0%", "1.0GB", "CPU:1.5 MEM:2"} {
+	for _, want := range []string{"PROJECT RESOURCE SUMMARY", "shop", "CPU95", "MEM95", "LIMITS", "40.0%", "1.0GB", "CPU:1.5 MEM:2.0GB"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("renderContainers() missing %q in:\n%s", want, view)
 		}
@@ -129,16 +131,18 @@ func TestRenderDetailShowsResourceSummary(t *testing.T) {
 		selectedID: "abc123",
 		containers: []docker.ContainerInfo{
 			{
-				ID:            "abc123",
-				Name:          "api",
-				Image:         "my-api:latest",
-				Status:        "running",
-				CPUPerc:       40,
-				MemMB:         512,
-				CPULimit:      1,
-				MemoryLimitMB: 1024,
-				LimitsKnown:   true,
-				Ports:         "8080:80",
+				ID:             "abc123",
+				Name:           "api",
+				Image:          "my-api:latest",
+				Status:         "running",
+				CPUPerc:        40,
+				MemMB:          512,
+				CPULimit:       1,
+				MemoryLimitMB:  1024,
+				LimitsKnown:    true,
+				ComposeProject: "shop",
+				ComposeService: "api",
+				Ports:          "8080:80",
 			},
 		},
 		history:    map[string][]float64{"abc123": []float64{10, 20, 40}},
@@ -146,7 +150,7 @@ func TestRenderDetailShowsResourceSummary(t *testing.T) {
 	}
 
 	view := m.renderDetail()
-	for _, want := range []string{"CPU", "Memory", "avg", "p95", "peak", "trend", "Limits"} {
+	for _, want := range []string{"Project", "shop", "Service", "api", "CPU", "Memory", "avg", "p95", "peak", "trend", "Limits"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("renderDetail() missing %q in:\n%s", want, view)
 		}

@@ -43,7 +43,7 @@ The dashboard has four panels:
 
 | Panel | Purpose |
 |---|---|
-| Containers | Live CPU/MEM, p95 summaries, limits, detail, logs, and history chart |
+| Containers | Live CPU/MEM, compose/project summary, p95 summaries, limits, detail, logs, and history chart |
 | Images | Local image tags and safe tag/image removal |
 | Problems | OOM/restart events, high CPU, memory pressure/growth, missing limits, and daemon disconnects |
 | Disk Usage | Docker storage breakdown and category-level prune actions |

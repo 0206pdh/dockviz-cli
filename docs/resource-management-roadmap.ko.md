@@ -41,12 +41,12 @@
 
 ## Phase 3 — Compose/Project Resource View
 
-상태: 다음 구현 후보
+상태: 구현 완료
 
 - `com.docker.compose.project`, `com.docker.compose.service` label을 읽어 compose project별로 묶는다.
-- project/service 단위 CPU/MEM 합계와 top offender를 표시한다.
-- 같은 service replica가 여러 개인 경우 service 단위로 합산한다.
-- project별 “idle but consuming memory”, “one service dominates CPU” 같은 요약을 만든다.
+- Containers 패널 상단에 project 단위 CPU/MEM 합계와 top offender를 표시한다.
+- Detail 화면에 compose project/service 정보를 표시한다.
+- 같은 service replica가 여러 개인 경우 service 단위로 합산하는 화면은 다음 refinement로 둔다.
 
 목적:
 

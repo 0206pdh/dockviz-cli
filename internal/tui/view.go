@@ -173,13 +173,16 @@ func (m Model) renderActivePanel() string {
 
 // renderContainers builds the container list table.
 func (m Model) renderContainers() string {
+	var rows []string
+	if hasProjectContext(m.containers) {
+		rows = append(rows, m.renderProjectSummary(), "")
+	}
+
 	// Header prefix is 2 spaces to match the 2-char cursor field in each row.
 	header := ui.HeaderStyle.Render(
 		fmt.Sprintf("  %-18s %-10s %-7s %-7s %-8s %-8s %-14s %-12s",
 			"NAME", "GRAPH", "CPU", "CPU95", "MEM", "MEM95", "LIMITS", "STATUS"),
 	)
-
-	var rows []string
 	rows = append(rows, header)
 
 	for i, c := range m.containers {
@@ -244,6 +247,43 @@ func (m Model) renderContainers() string {
 		rows = append(rows, "\n  No containers found.")
 	}
 
+	return strings.Join(rows, "\n")
+}
+
+func (m Model) renderProjectSummary() string {
+	projects := summarizeProjects(m.containers)
+	if len(projects) == 0 {
+		return ""
+	}
+
+	rows := []string{
+		ui.HeaderStyle.Render("  PROJECT RESOURCE SUMMARY"),
+		ui.HeaderStyle.Render(fmt.Sprintf("  %-18s %-7s %-7s %-8s %-24s %-18s",
+			"PROJECT", "RUN", "CPU", "MEM", "LIMITS", "TOP CPU")),
+	}
+	maxProjects := 3
+	if len(projects) < maxProjects {
+		maxProjects = len(projects)
+	}
+	for i := 0; i < maxProjects; i++ {
+		p := projects[i]
+		top := "-"
+		if p.TopContainer != "" {
+			top = fmt.Sprintf("%s %s", truncate(p.TopContainer, 10), formatPercent(p.TopCPU))
+		}
+		limits := formatProjectLimits(p)
+		if p.Unbounded > 0 {
+			limits += fmt.Sprintf(" +%d nolimit", p.Unbounded)
+		}
+		rows = append(rows, fmt.Sprintf("  %-18s %-7s %-7s %-8s %-24s %-18s",
+			truncate(p.Name, 18),
+			fmt.Sprintf("%d/%d", p.Running, p.Containers),
+			formatPercent(p.CPU),
+			formatMB(p.MemoryMB),
+			truncate(limits, 24),
+			truncate(top, 18),
+		))
+	}
 	return strings.Join(rows, "\n")
 }
 
@@ -644,8 +684,14 @@ func (m Model) renderDetail() string {
 			row("ID", c.ID),
 			row("Image", c.Image),
 			row("Status", ui.StatusStyle(c.Status).Render(ui.StatusIcon(c.Status)+" "+c.Status)),
-			row("Ports", c.Ports),
 		}
+		if c.ComposeProject != "" {
+			lines = append(lines, row("Project", c.ComposeProject))
+		}
+		if c.ComposeService != "" {
+			lines = append(lines, row("Service", c.ComposeService))
+		}
+		lines = append(lines, row("Ports", c.Ports))
 
 		if c.Status == "running" {
 			cpu := summarizeResource(m.history[c.ID])

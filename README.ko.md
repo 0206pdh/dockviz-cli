@@ -18,7 +18,7 @@ Docker Engine이나 Docker CLI를 대체하는 범용 명령어 래퍼는 아닙
 
 | 패널 | 목적 |
 |---|---|
-| Containers | CPU/MEM, p95 요약, limit, 상세 정보, 로그, 추이 차트 |
+| Containers | CPU/MEM, compose/project 요약, p95 요약, limit, 상세 정보, 로그, 추이 차트 |
 | Images | 로컬 이미지 태그 조회와 태그/이미지 삭제 |
 | Problems | OOM/restart event, high CPU, memory pressure/growth, limit 누락, daemon 연결 문제 |
 | Disk Usage | 이미지·컨테이너·볼륨·build cache·로그 분석과 prune |

@@ -12,17 +12,19 @@ import (
 
 // ContainerInfo holds the data shown in the TUI list.
 type ContainerInfo struct {
-	ID            string
-	Name          string
-	Image         string
-	Status        string  // "running", "stopped", "paused", etc.
-	CPUPerc       float64 // percentage 0-100
-	MemMB         float64 // megabytes
-	CPULimit      float64
-	MemoryLimitMB float64
-	LimitsKnown   bool
-	Ports         string   // human-readable port bindings
-	Volumes       []string // mount points, e.g. ["/host/path → /ctr/path", "vol → /data:ro"]
+	ID             string
+	Name           string
+	Image          string
+	Status         string  // "running", "stopped", "paused", etc.
+	CPUPerc        float64 // percentage 0-100
+	MemMB          float64 // megabytes
+	CPULimit       float64
+	MemoryLimitMB  float64
+	LimitsKnown    bool
+	ComposeProject string
+	ComposeService string
+	Ports          string   // human-readable port bindings
+	Volumes        []string // mount points, e.g. ["/host/path → /ctr/path", "vol → /data:ro"]
 }
 
 // ListContainers returns all containers (running + stopped).
@@ -54,15 +56,17 @@ func (c *Client) ListContainers() ([]ContainerInfo, error) {
 			vols = append(vols, entry)
 		}
 		result = append(result, ContainerInfo{
-			ID:            ctr.ID[:12],
-			Name:          name,
-			Image:         ctr.Image,
-			Status:        ctr.State,
-			CPULimit:      cpuLimit,
-			MemoryLimitMB: memLimit,
-			LimitsKnown:   limitsKnown,
-			Ports:         formatPorts(ctr.Ports),
-			Volumes:       vols,
+			ID:             ctr.ID[:12],
+			Name:           name,
+			Image:          ctr.Image,
+			Status:         ctr.State,
+			CPULimit:       cpuLimit,
+			MemoryLimitMB:  memLimit,
+			LimitsKnown:    limitsKnown,
+			ComposeProject: ctr.Labels["com.docker.compose.project"],
+			ComposeService: ctr.Labels["com.docker.compose.service"],
+			Ports:          formatPorts(ctr.Ports),
+			Volumes:        vols,
 		})
 	}
 	c.pruneResourceLimitCache(currentIDs)
