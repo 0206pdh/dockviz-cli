@@ -1,8 +1,9 @@
-# ci.yml — build, vet, and test on every pull request and push to main.
+# ci.yml — lint, build, and test on every pull request and push to main.
 #
 # release.yml publishes whatever is tagged, so this workflow is the gate that
-# keeps broken commits from reaching a tag. Only the pure-logic unit tests run
-# here; real-daemon validation stays in scenarios/ (see TODOS.md T-005).
+# keeps broken commits from reaching a tag (release.yml re-runs the same tests
+# on the tagged commit). Only pure-logic unit tests run here; real-daemon
+# validation is manual for now (docs/validation.ko.md, TODOS.ko.md T-007).
 name: CI
 
 on:
@@ -19,7 +20,7 @@ concurrency:
 
 jobs:
   lint:
-    name: gofmt / go vet
+    name: gofmt / mod tidy / go vet
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +37,11 @@ jobs:
             echo "$unformatted"
             exit 1
           fi
+
+      - name: go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
 
       - name: go vet (linux, windows, darwin)
         run: |
@@ -60,5 +66,10 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Test (race detector)
+        if: runner.os == 'Linux'
+        run: go test -race ./...
+
       - name: Test
+        if: runner.os != 'Linux'
         run: go test ./...

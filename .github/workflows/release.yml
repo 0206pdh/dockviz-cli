@@ -1,43 +1,70 @@
-# release.yml — build cross-platform binaries and publish a GitHub Release.
+# release.yml — test, build cross-platform binaries, and publish a release.
 #
-# Triggers on:
-#   - push of a version tag (e.g. v1.2.3)               → release exactly that version
+# Triggers on a pushed version tag (vMAJOR.MINOR.PATCH, optional -suffix such
+# as -rc.1). Ordinary pushes to main never release; ci.yml gates those.
 #
-# Artifacts produced:
-#   dockviz-linux-amd64
-#   dockviz-linux-amd64.deb
-#   dockviz-<version>-py3-none-<platform>.whl
-#   dockviz-windows-amd64.exe
-#   dockviz-darwin-amd64
+# Flow:
+#   determine_version → test → build (6 targets) → package_python / package_deb
+#     → release (GitHub Release + SHA256SUMS)
+#     → publish_pypi     (only when vars.PYPI_PUBLISHING_ENABLED == 'true')
+#     → deploy_apt_repo  (only when the APT_GPG_PRIVATE_KEY secret is set)
+#
+# Artifacts:
+#   dockviz-{linux,darwin,windows}-{amd64,arm64}[.exe]
+#   dockviz-linux-{amd64,arm64}.deb
+#   dockviz-<version>-py3-none-<platform>.whl (6 platforms)
+#   SHA256SUMS
 name: Release
 
 on:
   push:
     tags:
-      - "v*"   # trigger on any tag that looks like a version
+      - "v*"
+
+permissions:
+  contents: read
 
 jobs:
   determine_version:
     name: Determine Release Version
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
+      - name: Validate tag format
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$TAG' is not vMAJOR.MINOR.PATCH[-suffix]"
+            exit 1
+          fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Test Tagged Commit
+    needs: determine_version
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout source
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history + tags, needed to find the latest version
 
-      - name: Resolve version
-        id: version
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Vet and test
         run: |
-          echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          go vet ./...
+          GOOS=windows go vet ./...
+          GOOS=darwin go vet ./...
+          go test -race ./...
 
   build:
     name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
-    needs: determine_version
+    needs: [determine_version, test]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -284,6 +311,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist/          # each artifact lands in dist/<artifact-name>/
+
+      - name: Generate SHA256SUMS
+        run: |
+          mkdir -p dist/checksums
+          # Artifact names are unique across subdirectories, so list them by
+          # file name only; users verify with `sha256sum -c --ignore-missing`.
+          find dist -type f ! -path 'dist/checksums/*' -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            | sed -E 's#  dist/[^/]+/#  #' > dist/checksums/SHA256SUMS
+          cat dist/checksums/SHA256SUMS
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
