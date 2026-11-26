@@ -12,12 +12,16 @@ import (
 
 // ContainerInfo holds the data shown in the TUI list.
 type ContainerInfo struct {
-	ID             string
-	Name           string
-	Image          string
-	Status         string  // "running", "stopped", "paused", etc.
-	CPUPerc        float64 // percentage 0-100
-	MemMB          float64 // megabytes
+	ID      string
+	Name    string
+	Image   string
+	Status  string  // "running", "stopped", "paused", etc.
+	CPUPerc float64 // percentage 0-100
+	MemMB   float64 // megabytes
+	// StatsOK is true when CPUPerc/MemMB come from a successful stats sample
+	// in this refresh. A failed or timed-out sample leaves it false so the
+	// zero values are not mistaken for a real 0% / 0MB reading.
+	StatsOK        bool
 	CPULimit       float64
 	MemoryLimitMB  float64
 	LimitsKnown    bool
@@ -29,7 +33,9 @@ type ContainerInfo struct {
 
 // ListContainers returns all containers (running + stopped).
 func (c *Client) ListContainers() ([]ContainerInfo, error) {
-	containers, err := c.cli.ContainerList(c.ctx, container.ListOptions{All: true})
+	ctx, cancel := context.WithTimeout(c.ctx, listTimeout)
+	defer cancel()
+	containers, err := c.cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +81,12 @@ func (c *Client) ListContainers() ([]ContainerInfo, error) {
 
 // FetchStats fetches a single-shot stats snapshot for a container.
 func (c *Client) FetchStats(id string) (cpu float64, memMB float64, err error) {
-	resp, err := c.cli.ContainerStats(context.Background(), id, false)
+	// A one-shot stats call normally returns in ~1-2s (the daemon samples
+	// twice to compute CPU delta). The timeout keeps one unresponsive
+	// container from stalling the whole refresh.
+	ctx, cancel := context.WithTimeout(c.ctx, statsTimeout)
+	defer cancel()
+	resp, err := c.cli.ContainerStats(ctx, id, false)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -150,7 +161,9 @@ func (c *Client) containerResourceLimits(id string) (cpuLimit float64, memoryLim
 	}
 	c.resourceLimitsMu.Unlock()
 
-	inspect, err := c.cli.ContainerInspect(c.ctx, id)
+	ctx, cancel := context.WithTimeout(c.ctx, inspectTimeout)
+	defer cancel()
+	inspect, err := c.cli.ContainerInspect(ctx, id)
 	if err != nil || inspect.HostConfig == nil {
 		return 0, 0, false
 	}

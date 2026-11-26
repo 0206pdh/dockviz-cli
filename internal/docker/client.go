@@ -7,8 +7,19 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/client"
+)
+
+// Timeouts for calls on the periodic refresh path. Without them a single
+// unresponsive daemon call blocks the refresh forever, and the TUI skips new
+// refreshes while one is still in flight. Long-running user-initiated
+// operations (prune, remove) and streams are deliberately not bounded here.
+const (
+	listTimeout    = 10 * time.Second
+	statsTimeout   = 10 * time.Second
+	inspectTimeout = 5 * time.Second
 )
 
 // Client wraps the Docker SDK client with a shared context.

@@ -76,4 +76,4 @@ Items deferred from engineering review (2026-03-30) and design doc.
 
 **Context:** Every merged PR so far (#6–#11) has relied on the author running `go build`/`go test` locally before pushing. Fine at the current single-maintainer scale, but each auto-release (`release.yml`, merged in #10) ships whatever is on `main` immediately — there's no gate between "merged" and "published to PyPI/APT/GitHub Releases".
 
-**Status:** Deferred
+**Status:** Done (unit-test level) — `.github/workflows/ci.yml` runs gofmt, `go vet` (linux/windows/darwin), and `go build`/`go test` on ubuntu/macos/windows for every PR and push to `main`. Real-daemon integration coverage for `Client` is still open.

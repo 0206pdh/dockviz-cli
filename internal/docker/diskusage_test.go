@@ -74,8 +74,12 @@ func TestLocalDockerHost(t *testing.T) {
 }
 
 func TestDockerDesktopVHDXPaths(t *testing.T) {
-	paths := dockerDesktopVHDXPaths(`C:\Users\me\AppData\Local`, `C:\Users\me`)
-	want := `C:\Users\me\AppData\Local\Docker\wsl\disk\docker_data.vhdx`
+	localAppData := `C:\Users\me\AppData\Local`
+	paths := dockerDesktopVHDXPaths(localAppData, `C:\Users\me`)
+	// filepath.Join uses the host separator; this path is only probed on
+	// Windows, so build the expectation the same way to keep the test
+	// portable to Linux/macOS CI.
+	want := filepath.Join(localAppData, "Docker", "wsl", "disk", "docker_data.vhdx")
 	if len(paths) == 0 || paths[0] != want {
 		t.Fatalf("dockerDesktopVHDXPaths()[0] = %q, want %q", paths[0], want)
 	}

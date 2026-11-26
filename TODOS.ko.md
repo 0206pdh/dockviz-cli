@@ -76,4 +76,4 @@
 
 **Context:** 지금까지 머지된 PR(#6~#11)은 전부 작성자가 로컬에서 `go build`/`go test`를 돌려본 뒤 push하는 데 의존했다. 메인테이너가 한 명인 지금 규모에선 그럭저럭 괜찮지만, 자동 릴리스(`release.yml`, #10에서 머지)는 `main`에 올라온 걸 즉시 배포한다 — "머지됨"과 "PyPI/APT/GitHub Releases에 배포됨" 사이에 아무 게이트가 없다.
 
-**Status:** 연기
+**Status:** 완료 (단위 테스트 수준) — `.github/workflows/ci.yml`이 모든 PR과 `main` push에서 gofmt, `go vet`(linux/windows/darwin), ubuntu/macos/windows의 `go build`/`go test`를 실행한다. `Client`의 실제 daemon 통합 테스트는 아직 남아 있다.

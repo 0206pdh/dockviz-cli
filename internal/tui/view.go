@@ -121,20 +121,13 @@ func (m Model) renderTabs() string {
 	}
 	tabs := []tabDef{
 		{" 📦 Containers ", PanelContainers},
-		{" 🌐 Networks ", PanelNetworks},
 		{" 🗃  Images ", PanelImages},
-		{" 📋 Events ", PanelEvents},
+		{" ⚠ Problems ", PanelProblems},
 		{" 💾 Disk Usage ", PanelDiskUsage},
 	}
 
 	var parts []string
 	for _, t := range tabs {
-		if t.panel == PanelNetworks {
-			continue
-		}
-		if t.panel == PanelProblems {
-			t.label = " ⚠ Problems "
-		}
 		if t.panel == m.activePanel {
 			parts = append(parts, lipgloss.NewStyle().
 				Bold(true).
@@ -196,8 +189,10 @@ func (m Model) renderContainers() string {
 		mem := "-"
 		memP95 := "-"
 		if c.Status == "running" {
-			cpu = formatPercent(c.CPUPerc)
-			mem = formatMB(c.MemMB)
+			if c.StatsOK {
+				cpu = formatPercent(c.CPUPerc)
+				mem = formatMB(c.MemMB)
+			}
 			if h := m.history[c.ID]; len(h) > 0 {
 				cpuP95 = formatPercent(summarizeResource(h).P95)
 			}
@@ -286,128 +281,6 @@ func (m Model) renderProjectSummary() string {
 	}
 	return strings.Join(rows, "\n")
 }
-
-// renderNetworks shows a split layout: left = topology graph, right = event timeline.
-// When m.width < 80 (narrow terminal or before the first WindowSizeMsg) it falls
-// back to a simple network list to avoid layout corruption.
-func (m Model) renderNetworks() string {
-	return ""
-}
-
-/*
-	if m.width < 80 {
-		return m.renderNetworksFallback()
-	}
-
-	halfW := m.width/2 - 4
-
-	// --- Left panel: topology graph ---
-	topoTitle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorBlue).Render("  Topology")
-	topoBody := ui.RenderNetworkGraph(m.networks, m.ContainerStates)
-	leftContent := topoTitle + "\n\n" + topoBody
-	leftPanel := ui.PanelStyle.Width(halfW).Render(leftContent)
-
-	// --- Right panel: event timeline for selected network ---
-	var timelineTitle string
-	var timelineBody string
-	if m.cursor < len(m.networks) {
-		n := m.networks[m.cursor]
-		timelineTitle = lipgloss.NewStyle().Bold(true).Foreground(ui.ColorBlue).
-			Render(fmt.Sprintf("  Events — %s", n.Name))
-
-		// Build a set of container names belonging to this network.
-		netContainers := make(map[string]bool, len(n.Containers))
-		for _, ep := range n.Containers {
-			netContainers[ep.Name] = true
-		}
-
-		// Filter events to this network's containers.
-		var filtered []string
-		maxRows := m.height - 10
-		if maxRows < 4 {
-			maxRows = 4
-		}
-		for _, e := range m.events {
-			if !netContainers[e.ContainerName] {
-				continue
-			}
-			timeStr := e.Time.Format("15:04:05")
-			icon, style := eventActionStyle(e.Action)
-			actionText := fmt.Sprintf("%-10s", icon+" "+e.Action)
-			actionStr := style.Render(actionText)
-
-			line := fmt.Sprintf("  %-10s %s %-18s", timeStr, actionStr, truncate(e.ContainerName, 18))
-
-			// Append ExitCode / OOM annotation for die events.
-			if e.Action == "die" {
-				ann := fmt.Sprintf(" exit=%d", e.ExitCode)
-				if e.OOMKilled {
-					ann += lipgloss.NewStyle().Foreground(ui.ColorRed).Render(" OOM")
-				}
-				line += ann
-			}
-			filtered = append(filtered, line)
-			if len(filtered) >= maxRows {
-				break
-			}
-		}
-
-		if len(filtered) == 0 {
-			timelineBody = "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).
-				Render("No events for this network yet.")
-		} else {
-			timelineBody = "\n" + strings.Join(filtered, "\n")
-		}
-	} else {
-		timelineTitle = lipgloss.NewStyle().Foreground(ui.ColorGray).Render("  Events")
-		timelineBody = "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).Render("Select a network.")
-	}
-
-	rightContent := timelineTitle + timelineBody
-	rightPanel := ui.PanelStyle.Width(halfW).Render(rightContent)
-
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, "  ", rightPanel)
-}
-
-// renderNetworksFallback is used when the terminal is narrower than 80 columns.
-// It renders a plain network list without the split topology/timeline panels.
-func (m Model) renderNetworksFallback() string {
-	header := ui.HeaderStyle.Render(
-		fmt.Sprintf("  %-22s %-10s %-20s %-5s", "NETWORK", "DRIVER", "SUBNET", "CTRS"),
-	)
-
-	var rows []string
-	rows = append(rows, header)
-
-	for i, n := range m.networks {
-		cursor := "  "
-		if i == m.cursor {
-			cursor = "▶ "
-		}
-		subnet := n.Subnet
-		if subnet == "" {
-			subnet = "—"
-		}
-		row := fmt.Sprintf("%s%-22s %-10s %-20s %d",
-			cursor,
-			truncate(n.Name, 22),
-			truncate(n.Driver, 10),
-			truncate(subnet, 20),
-			len(n.Containers),
-		)
-		if i == m.cursor {
-			row = ui.SelectedRowStyle.Render(row)
-		}
-		rows = append(rows, row)
-	}
-
-	if len(m.networks) == 0 {
-		rows = append(rows, "\n  No networks found.")
-	}
-	return strings.Join(rows, "\n")
-}
-
-*/
 
 // renderImages builds the image list table.
 func (m Model) renderImages() string {
@@ -584,84 +457,6 @@ func hostStorageOutsideDockerDF(du docker.DiskUsageInfo) float64 {
 		return 0
 	}
 	return outside
-}
-
-// renderEvents shows a live-updating timeline of Docker container lifecycle events.
-// Events are displayed newest-first. The panel starts streaming when first visited.
-func (m Model) renderEvents() string {
-	header := ui.HeaderStyle.Render(
-		fmt.Sprintf("  %-10s %-14s %-22s %-12s", "TIME", "ACTION", "CONTAINER", "ID"),
-	)
-
-	var rows []string
-	rows = append(rows, header)
-
-	if len(m.events) == 0 {
-		hint := "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).Render("Waiting for Docker events...")
-		rows = append(rows, hint)
-		return strings.Join(rows, "\n")
-	}
-
-	// Cap visible rows to the available terminal height.
-	maxVisible := m.height - 9
-	if maxVisible < 5 {
-		maxVisible = 5
-	}
-	events := m.events
-	if len(events) > maxVisible {
-		events = events[:maxVisible]
-	}
-
-	for _, e := range events {
-		timeStr := e.Time.Format("15:04:05")
-
-		// Pre-pad the action field (icon + text) to a fixed width before colorising,
-		// so subsequent columns stay aligned despite ANSI codes.
-		icon, style := eventActionStyle(e.Action)
-		actionText := fmt.Sprintf("%-12s", icon+" "+e.Action)
-		actionStr := style.Render(actionText)
-
-		row := fmt.Sprintf("  %-10s %s %-22s %-12s",
-			timeStr,
-			actionStr,
-			truncate(e.ContainerName, 22),
-			e.ContainerID,
-		)
-		rows = append(rows, row)
-	}
-
-	// Live / disconnected indicator in the last line.
-	var liveHint string
-	if m.eventDisconnected {
-		liveHint = "\n  " + lipgloss.NewStyle().Foreground(ui.ColorRed).
-			Render("○ disconnected  •  press [r] to reconnect")
-	} else {
-		liveHint = "\n  " + lipgloss.NewStyle().Foreground(ui.ColorGray).
-			Render(fmt.Sprintf("● live  •  %d events", len(m.events)))
-	}
-	rows = append(rows, liveHint)
-
-	return strings.Join(rows, "\n")
-}
-
-// eventActionStyle returns the icon and lip gloss style for a given Docker event action.
-func eventActionStyle(action string) (string, lipgloss.Style) {
-	switch action {
-	case "start", "unpause":
-		return "●", lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	case "die", "kill", "stop":
-		return "○", lipgloss.NewStyle().Foreground(ui.ColorRed)
-	case "pause":
-		return "◑", lipgloss.NewStyle().Foreground(ui.ColorYellow)
-	case "restart":
-		return "↻", lipgloss.NewStyle().Foreground(ui.ColorBlue)
-	case "create":
-		return "✦", lipgloss.NewStyle().Foreground(ui.ColorGray)
-	case "destroy":
-		return "✕", lipgloss.NewStyle().Foreground(ui.ColorRed)
-	default:
-		return "•", lipgloss.NewStyle().Foreground(ui.ColorGray)
-	}
 }
 
 // renderDetail shows detailed info for the selected container.
@@ -882,21 +677,13 @@ func (m Model) renderFooter() string {
 	var line2 string
 	switch m.activePanel {
 	case PanelContainers:
-		line2 = "[Enter] Detail  [s] Start/Stop  [d] Delete  [l] Logs  [g] Chart  [e] Exec"
-	case PanelNetworks:
-		line2 = "● running  ◑ restarting  ✗ dead  ○ unknown  ·  [↑↓] select network"
+		line2 = "[Enter] Detail  [d] Delete  [l] Logs  [g] Chart"
 	case PanelImages:
 		line2 = "[d] Delete image"
 	case PanelProblems:
-		line2 = "● live streaming  ·  events appear as they happen"
+		line2 = "[Enter] inspect  ·  live problem detection"
 	case PanelDiskUsage:
 		line2 = "[d] Prune selected category  ·  0B = measured zero  ·  N/A = unavailable"
-	}
-	if m.activePanel == PanelContainers {
-		line2 = "[Enter] Detail  [d] Delete  [l] Logs  [g] Chart"
-	}
-	if m.activePanel == PanelProblems {
-		line2 = "[Enter] inspect  ·  live problem detection"
 	}
 	return "\n" + ui.FooterStyle.Render(line1) + "\n" + ui.FooterStyle.Render(line2)
 }
