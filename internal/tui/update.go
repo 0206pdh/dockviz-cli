@@ -37,7 +37,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Auto-refresh timer fired
 	case tickMsg:
-		return m, tea.Batch(fetchDataCmd(m.docker), tickCmd())
+		// Skip this tick if the previous fetch is still running; otherwise
+		// slow stats sampling would pile up overlapping fetches.
+		if m.fetchInFlight() {
+			return m, tickCmd()
+		}
+		return m, tea.Batch(m.nextFetch(), tickCmd())
 
 	case diskUsageRefreshMsg:
 		if m.activePanel != PanelDiskUsage && m.activePanel != PanelProblems {
@@ -47,6 +52,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Fresh Docker data arrived
 	case dataMsg:
+		// Drop results older than what is already on screen so an
+		// out-of-order response cannot rewind state or reorder history.
+		if msg.seq <= m.appliedSeq {
+			return m, nil
+		}
+		m.appliedSeq = msg.seq
 		m.loading = false
 		m.refreshing = false
 		if msg.err != nil {
@@ -62,8 +73,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update per-container CPU and MEM history (60 readings = ~2 min at 2s refresh).
 		// The sparkline in the container list takes the last 10 entries; the
 		// full-screen chart uses all 60.
+		// Only successful samples enter the history: a failed stats call
+		// would otherwise record a fake 0% / 0MB point and skew p95/trend.
 		for _, c := range m.containers {
-			if c.Status == "running" {
+			if c.Status == "running" && c.StatsOK {
 				h := m.history[c.ID]
 				h = append(h, c.CPUPerc)
 				if len(h) > 60 {
@@ -110,7 +123,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	// Interactive exec process returned — resume TUI on the dashboard.
 	// Disk usage breakdown arrived
 	case diskUsageMsg:
 		if msg.err != nil {
@@ -153,14 +165,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingDeleteID = ""
 			switch m.activePanel {
 			case PanelImages:
-				return m, removeImageCmd(m.docker, id)
+				m.fetchSeq++
+				return m, removeImageCmd(m.docker, id, m.fetchSeq)
 			case PanelDiskUsage:
 				m.pruning = true
 				m.pruneResultMsg = ""
 				return m, pruneCmd(m.docker, id)
 			default:
 				// Default: container removal
-				return m, removeContainerCmd(m.docker, id)
+				m.fetchSeq++
+				return m, removeContainerCmd(m.docker, id, m.fetchSeq)
 			}
 		case "n", "N", "esc":
 			// User cancelled.
@@ -284,12 +298,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.eventCh = m.docker.StreamEvents(ctx)
 			m.eventCancel = cancel
 			m.eventDisconnected = false
-			return m, tea.Batch(fetchDataCmd(m.docker), waitForEventCmd(m.eventCh))
+			return m, tea.Batch(m.nextFetch(), waitForEventCmd(m.eventCh))
 		}
 		if m.activePanel == PanelDiskUsage || m.activePanel == PanelProblems {
 			return m, fetchDiskUsageCmd(m.docker)
 		}
-		return m, fetchDataCmd(m.docker)
+		return m, m.nextFetch()
 
 	case keyMatches(msg, km.Back):
 		m.activeView = ViewDashboard
@@ -363,23 +377,23 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // removeContainerCmd force-removes a container then refreshes the container list.
 // If the remove fails, the error is surfaced to the dashboard via dataMsg.
-func removeContainerCmd(dc docker.DockerClient, id string) tea.Cmd {
+func removeContainerCmd(dc docker.DockerClient, id string, seq uint64) tea.Cmd {
 	return func() tea.Msg {
 		if err := dc.RemoveContainer(id); err != nil {
-			return dataMsg{err: err}
+			return dataMsg{seq: seq, err: err}
 		}
-		return fetchDataCmd(dc)()
+		return fetchDataCmd(dc, seq)()
 	}
 }
 
 // removeImageCmd removes a local image then refreshes the data.
 // If the remove fails, the error is surfaced to the dashboard via dataMsg.
-func removeImageCmd(dc docker.DockerClient, id string) tea.Cmd {
+func removeImageCmd(dc docker.DockerClient, id string, seq uint64) tea.Cmd {
 	return func() tea.Msg {
 		if err := dc.RemoveImage(id); err != nil {
-			return dataMsg{err: err}
+			return dataMsg{seq: seq, err: err}
 		}
-		return fetchDataCmd(dc)()
+		return fetchDataCmd(dc, seq)()
 	}
 }
 
@@ -418,8 +432,6 @@ func categoryLabel(key string) string {
 	return key
 }
 
-// It tries /bin/bash first, falls back to /bin/sh if bash is not available.
-// When the shell exits, Bubble Tea resumes and emits execDoneMsg.
 // waitForLogCmd blocks until the next line arrives on ch, then emits it as a logLineMsg.
 // Returns nil when the channel is closed (stream ended).
 func waitForLogCmd(ch <-chan docker.LogLine) tea.Cmd {

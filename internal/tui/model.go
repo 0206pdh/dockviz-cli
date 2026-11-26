@@ -28,12 +28,6 @@ const (
 	PanelDiskUsage
 )
 
-// PanelNetworks is kept as a compatibility sentinel for retired view code.
-const PanelNetworks Panel = -1
-
-// PanelEvents is a compatibility alias for the retired event timeline label.
-const PanelEvents Panel = PanelProblems
-
 // panelCount is the number of panels the Tab key cycles through.
 const panelCount = 4
 
@@ -51,7 +45,9 @@ const (
 type tickMsg time.Time
 
 // dataMsg carries freshly fetched Docker data back to Update.
+// seq identifies which fetch produced it so stale results can be dropped.
 type dataMsg struct {
+	seq        uint64
 	containers []docker.ContainerInfo
 	images     []docker.ImageInfo
 	err        error
@@ -123,6 +119,14 @@ type Model struct {
 	// refreshing is true between pressing 'r' and the data arriving back
 	refreshing bool
 
+	// fetchSeq is the sequence number of the most recently issued data fetch;
+	// appliedSeq is the newest fetch whose result has been applied. A fetch
+	// can take longer than the 2s tick (stats sampling alone is ~2s), so
+	// results may arrive out of order: anything older than appliedSeq is
+	// dropped, and the tick skips issuing a new fetch while one is in flight.
+	fetchSeq   uint64
+	appliedSeq uint64
+
 	// CPU sparkline / chart history: containerID → last 60 CPU% readings
 	history map[string][]float64
 	// Memory chart history: containerID → last 60 MEM MB readings
@@ -146,7 +150,7 @@ type Model struct {
 // Event streaming begins immediately so the timeline is populated from app launch —
 // not deferred to the first Events tab visit.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, fetchDataCmd(m.docker), tickCmd(), waitForEventCmd(m.eventCh))
+	return tea.Batch(m.spinner.Tick, fetchDataCmd(m.docker, m.fetchSeq), tickCmd(), waitForEventCmd(m.eventCh))
 }
 
 // newModel creates the initial Model. Accepts any DockerClient (real or demo).
@@ -168,6 +172,7 @@ func newModel(dc docker.DockerClient, version string, demo bool, composeContext 
 		keys:           DefaultKeyMap(),
 		spinner:        sp,
 		loading:        true,
+		fetchSeq:       1, // Init issues fetch #1
 		history:        make(map[string][]float64),
 		memHistory:     make(map[string][]float64),
 		eventCh:        eventCh,
@@ -188,10 +193,22 @@ func diskUsageRefreshCmd() tea.Cmd {
 	})
 }
 
+// nextFetch issues a new data fetch tagged with the next sequence number.
+func (m *Model) nextFetch() tea.Cmd {
+	m.fetchSeq++
+	return fetchDataCmd(m.docker, m.fetchSeq)
+}
+
+// fetchInFlight reports whether the most recently issued fetch has not
+// produced a result yet.
+func (m Model) fetchInFlight() bool {
+	return m.fetchSeq > m.appliedSeq
+}
+
 // fetchDataCmd fetches all Docker data concurrently and returns a dataMsg.
 // Containers and images are fetched in parallel goroutines.
 // For running containers, CPU/memory stats are fetched in a second parallel pass.
-func fetchDataCmd(dc docker.DockerClient) tea.Cmd {
+func fetchDataCmd(dc docker.DockerClient, seq uint64) tea.Cmd {
 	return func() tea.Msg {
 		var (
 			containers []docker.ContainerInfo
@@ -206,15 +223,15 @@ func fetchDataCmd(dc docker.DockerClient) tea.Cmd {
 		wg.Wait()
 
 		if cErr != nil {
-			return dataMsg{err: cErr}
+			return dataMsg{seq: seq, err: cErr}
 		}
 		if iErr != nil {
-			return dataMsg{err: iErr}
+			return dataMsg{seq: seq, err: iErr}
 		}
 
 		// Fetch CPU/memory stats for running containers in parallel.
-		// Errors are silently ignored — the list remains visible with zero stats
-		// rather than blocking the whole refresh.
+		// A failed sample does not fail the refresh: the container stays
+		// visible with StatsOK=false, and Update keeps it out of the history.
 		var statsMu sync.Mutex
 		var statsWg sync.WaitGroup
 		for i, c := range containers {
@@ -232,12 +249,14 @@ func fetchDataCmd(dc docker.DockerClient) tea.Cmd {
 				statsMu.Lock()
 				containers[i].CPUPerc = cpu
 				containers[i].MemMB = mem
+				containers[i].StatsOK = true
 				statsMu.Unlock()
 			}()
 		}
 		statsWg.Wait()
 
 		return dataMsg{
+			seq:        seq,
 			containers: containers,
 			images:     images,
 		}

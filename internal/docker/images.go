@@ -2,6 +2,7 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -19,7 +20,9 @@ type ImageInfo struct {
 
 // ListImages returns all locally available Docker images, one row per tag.
 func (c *Client) ListImages() ([]ImageInfo, error) {
-	images, err := c.cli.ImageList(c.ctx, image.ListOptions{All: false})
+	ctx, cancel := context.WithTimeout(c.ctx, listTimeout)
+	defer cancel()
+	images, err := c.cli.ImageList(ctx, image.ListOptions{All: false})
 	if err != nil {
 		return nil, err
 	}

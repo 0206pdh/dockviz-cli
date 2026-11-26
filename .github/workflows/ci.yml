@@ -1,0 +1,75 @@
+# ci.yml — lint, build, and test on every pull request and push to main.
+#
+# release.yml publishes whatever is tagged, so this workflow is the gate that
+# keeps broken commits from reaching a tag (release.yml re-runs the same tests
+# on the tagged commit). Only pure-logic unit tests run here; real-daemon
+# validation is manual for now (docs/validation.ko.md, TODOS.ko.md T-007).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: gofmt / mod tidy / go vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: go vet (linux, windows, darwin)
+        run: |
+          go vet ./...
+          GOOS=windows go vet ./...
+          GOOS=darwin go vet ./...
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test (race detector)
+        if: runner.os == 'Linux'
+        run: go test -race ./...
+
+      - name: Test
+        if: runner.os != 'Linux'
+        run: go test ./...

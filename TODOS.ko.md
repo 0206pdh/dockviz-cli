@@ -1,79 +1,181 @@
 # TODOS
 
-엔지니어링 리뷰(2026-03-30) 및 디자인 문서에서 연기된 항목들.
+dockviz의 고도화 로드맵과 남은 작업입니다. 2026-11-26, v0.8.0 기준으로 정리했습니다.
+범위와 "하지 않을 것"은 [TECHNICAL.ko.md §0](TECHNICAL.ko.md#0-한눈에-보기)을
+따릅니다.
 
 ---
 
-## T-001: ContainerStats 스트리밍 방식 전환 (stream=true)
+## 고도화 방향
 
-**What:** 2초마다 N+1 poll(컨테이너마다 FetchStats 호출) 대신 Docker 데몬이 push하는 `ContainerStats(stream=true)` 방식으로 전환.
+지금 dockviz는 "한 화면에서 보고, 안전하게 지운다"까지 해냅니다. 다음 단계는 세
+방향입니다.
 
-**Why:** 폴링 지연 없는 실시간 CPU/MEM 통계 업데이트 및 네트워크 부하 감소.
+1. **믿을 수 있게:** 실제 daemon 테스트, 취소 가능한 호출, 큰 환경에서도 안정적인 갱신
+2. **원인까지 보이게:** 문제가 떴을 때 "왜"를 같은 화면에서 답하기
+3. **TUI 밖에서도 쓰이게:** 스크립트, cron, CI에서 같은 판정을 쓰기
 
-**Pros:** 상태 변화 즉시 반영, 2초 tick 대기 없음.
+### 1단계: 기반 다지기 (먼저)
 
-**Cons:** 고루틴 복잡도 증가, Bubble Tea 메시지 통합 필요.
+고도화 기능이 늘수록 실제 daemon에서 깨지는 버그의 비용이 커집니다. 기능보다 먼저
+합니다.
 
-**Context:** v0.2.0에서 병렬 고루틴 방식(N+1 → 병렬) 구현 완료. 스트리밍은 추가 개선 옵션. v0.4.0에서 평가.
+| ID | 항목 | 효과 |
+|---|---|---|
+| T-007 | `Client` 실제 daemon 통합 테스트 (CI ubuntu) | volume prune 같은 회수량 버그를 머지 전에 잡음 |
+| T-006 | context를 받는 `DockerClient` | 종료·화면 전환 시 진행 중 호출 취소, prune/remove에도 제한 |
+| T-009 | stats 동시 조회 수 제한 + 마지막 정상값 유지 | 컨테이너 수십 개에서도 daemon burst 방지, 빈 값 대신 직전 값 표시 |
+| T-010 | event 기반 즉시 갱신 | `die`/`oom`/`kill` 도착 시 바로 조회해 2초 대기 없이 반영 |
 
-**Status:** 연기 → v0.4.0
+### 2단계: 원인까지 보이는 Problems
+
+지금은 "OOM이 났다"까지 알려주고 원인 확인은 사용자가 로그와 차트를 따로 열어야
+합니다. 문제 상세 한 화면에서 판단이 끝나게 만드는 것이 가장 큰 사용자 가치입니다.
+
+| ID | 항목 | 효과 |
+|---|---|---|
+| T-011 | 문제 상세에 종료 직전 로그 tail | `ContainerLogs(since, until)`로 `die` 시점 전후 N줄 표시. "왜 죽었나"를 바로 확인 |
+| T-012 | 문제 상세에 직전 CPU/MEM 추이 | OOM 직전 메모리 곡선을 같은 화면에 표시해 leak과 순간 급증을 구분 |
+| T-013 | healthcheck 신호 | `health_status: unhealthy` event와 inspect의 `Health`를 Problems에 반영 (지금은 무시함) |
+| T-014 | Compose 영향 전파 표시 | 문제가 난 service에 `depends_on`으로 묶인 service를 함께 표시 |
+| T-015 | replica를 service 단위로 합산 | 같은 service replica 여러 개를 한 줄로 묶어 project 요약 정확도 향상 |
+
+### 3단계: TUI 밖으로 (headless 모드)
+
+같은 판정 로직을 TUI 없이 실행하면 서버 운영에서 쓰임새가 크게 넓어집니다. 판정
+로직이 이미 순수 함수로 분리되어 있어 비용 대비 효과가 큽니다.
+
+| ID | 항목 | 효과 |
+|---|---|---|
+| T-016 | `dockviz problems --json`, `dockviz df --json` | 스크립트와 모니터링에서 결과를 그대로 사용 |
+| T-017 | 종료 코드 규약 | critical이 있으면 exit 2, warning이면 1. cron이나 CI health check에 바로 연결 |
+| T-018 | 기준값 설정 파일 | `~/.config/dockviz/config.yaml`과 프로젝트별 override로 CPU/MEM/storage 기준 조정 |
+
+### 4단계: 정리 기능 다듬기
+
+| ID | 항목 | 효과 |
+|---|---|---|
+| T-019 | prune 대상 미리보기 | 확인창에서 실제로 지워질 이미지/볼륨 목록과 크기를 보여줌 |
+| T-020 | 볼륨 단위 삭제 | 카테고리 전체 prune 대신 볼륨 목록(크기, 라벨, 마지막 사용 컨테이너)에서 하나씩 삭제 |
+| T-021 | 로그 rotation 권장 | `max-size`가 없는 컨테이너를 찾아 compose `logging` 설정 예시 제시 |
+| T-004 | 원격에서도 동작하는 Container Logs 크기 측정 | Docker Desktop/원격에서도 로그 용량 확인 (비용이 커서 요청 시에만) |
+
+### 그 밖의 항목
+
+| ID | 항목 | 효과 |
+|---|---|---|
+| T-001 | 컨테이너 stats 스트리밍 | one-shot 조회의 약 2초 대기 제거. T-009로 부족할 때 검토 |
+| T-003 | `--demo`의 정해진 문제 시나리오 | daemon 없이 모든 Problems 신호를 예측 가능한 순서로 재생 (스크린샷/GIF용) |
+| T-008 | 크로스 플랫폼 검증 시나리오 | PowerShell 전용 `scenarios/`를 POSIX shell 또는 Go로 이식 |
+| T-022 | 목록 검색/정렬 | `/`로 이름 필터, CPU/MEM/크기 기준 정렬 |
+| T-023 | Docker context 지원 | `--context`로 `docker context`에 등록된 endpoint 선택 |
+
+### 권장 순서
+
+T-007 → T-006 → T-011·T-012 → T-016·T-017 → T-019 순서를 권장합니다.
+
+- 통합 테스트가 있어야 이후 변경을 안전하게 할 수 있습니다.
+- 로그와 추이를 문제 상세에 붙이는 작업이 사용자 체감이 가장 큽니다.
+- headless 모드는 기존 판정 로직을 재사용하므로 작은 비용으로 쓰임새를 넓힙니다.
 
 ---
 
-## T-002: Events 탭 필터링 UI
+## 작업 상세
 
-**What:** 이벤트 타입(die, restart, start 등) 또는 컨테이너 이름으로 Events 탭 필터링.
+### T-001: 컨테이너 stats 스트리밍
 
-**Why:** 컨테이너가 많을수록 Events 탭에 노이즈 증가. 장애 디버깅 시 `die`, `restart` 이벤트만 보고 싶은 경우.
+실행 중 컨테이너마다 `ContainerStats(stream=true)`를 유지해 one-shot 조회의 두 번
+측정 대기(컨테이너 12개 병렬 약 2초)를 없앱니다. 컨테이너마다 goroutine과 HTTP
+stream이 필요하고, 시작/중지에 따른 수명 관리가 들어갑니다. 갱신이 겹치는 문제는
+이미 조회 순번으로 해결했으므로 T-009로 부족할 때 진행합니다.
 
-**Pros:** DevOps 엔지니어 사용성 향상, 온콜 시 핵심 이벤트 집중 가능.
+### T-003: `--demo`의 정해진 문제 시나리오
 
-**Cons:** UX 설계 필요(필터 입력 오버레이 또는 토글 키).
+OOM kill → restart loop → 회복, 메모리 증가 곡선, storage offender 등장을 정해진
+타임라인으로 재생합니다. 지금 `DemoClient`는 무작위 event와 현실적인 exit code만
+냅니다.
 
-**Context:** v0.3.0의 네트워크별 타임라인이 이미 암묵적 필터링을 제공. 전역 필터 UI는 Events 탭에 여전히 유용.
+### T-004: 원격에서도 동작하는 Container Logs 크기 측정
 
-**Status:** 연기 → v0.4.0
+지금은 `LogPath`를 로컬에서 stat하므로 Docker Desktop과 원격 `DOCKER_HOST`에서는
+unavailable입니다. `ContainerLogs`를 스트리밍해 바이트를 세면 어디서나 동작하지만
+`stat()`보다 훨씬 비싸므로, 자동 갱신이 아니라 컨테이너별 요청 시에만 실행합니다.
+주요 대상인 네이티브 Linux 서버는 이미 동작하므로 우선순위는 낮습니다.
 
----
+### T-005: 자동 테스트/lint 워크플로 — 완료
 
-## T-003: `--demo` 크래시 시나리오 시뮬레이션
+`.github/workflows/ci.yml`이 모든 PR과 `main` push에서 gofmt, `go mod tidy` 검사,
+3개 OS 대상 `go vet`, ubuntu/macOS/Windows의 `go build`/`go test`(ubuntu는 `-race`)를
+실행합니다. `release.yml`도 tag 빌드 전에 테스트를 다시 돌립니다.
 
-**What:** 데모 모드에서 타이머 기반 die → restart 사이클을 구현해 토폴로지 노드 색상 변화를 녹화 없이 시연 가능하게.
+### T-006: context를 받는 `DockerClient`
 
-**Why:** Docker 환경 없이도 실시간 토폴로지 + 이벤트 연동 기능을 GIF 하나로 증명 가능.
+`ListContainers`, `FetchStats`, `DiskUsage`, `Prune*`, `Remove*`에 첫 인자로
+`ctx context.Context`를 추가합니다. 갱신 경로에는 지금 내부 timeout이 있지만 호출자가
+취소할 수 없고, prune/remove에는 제한이 없습니다. TUI command에서 취소 가능한
+context를 넘기고 종료 시 남은 작업을 취소합니다.
 
-**Context:** v0.3.0에서 랜덤 die 이벤트에 현실적인 ExitCode/OOMKilled가 추가됨. 고정 타이밍 die → restart 사이클이 있으면 GIF 녹화에 최적.
+### T-007: `Client` 실제 daemon 통합 테스트
 
-**Status:** v0.3.0에서 부분 구현(현실적인 exit code). 스크립트 사이클 → v0.4.0
+build tag나 `DOCKVIZ_INTEGRATION=1`로 켜는 테스트를 만들고, 라벨을 붙인
+컨테이너/볼륨/이미지로 `DiskUsage`와 `Prune*` 수치를 확인한 뒤 정리합니다. Docker가
+설치된 GitHub `ubuntu-latest` runner에서 실행합니다.
+[validation.ko.md](docs/validation.ko.md)의 수동 검증 중 volume prune, 태그 삭제,
+Container Logs 항목을 자동화하는 것이 1차 목표입니다.
 
----
+### T-008: 크로스 플랫폼 검증 시나리오
 
-## T-004: 원격 환경에서도 동작하는 Container Logs 용량 측정
+`scenarios/`의 PowerShell 스크립트를 POSIX shell 또는
+`scenarios/stats_parallel_benchmark.go` 옆의 작은 Go 프로그램으로 옮깁니다.
 
-**What:** Disk Usage 패널의 Container Logs 카테고리는 `ContainerInspect(id).LogPath`를 로컬 파일시스템에서 직접 stat한다. dockviz와 `dockerd`가 파일시스템을 공유할 때만 동작한다(순수 리눅스, 또는 `dockerd`가 직접 도는 WSL2 distro). Docker Desktop(WSL2/Hyper-V 백엔드)이나 원격 `DOCKER_HOST`에서는 조용히 0으로 나온다. `docs/troubleshooting.md#13`, `docs/testing-container-log-disk-usage.md` 참고.
+### T-009: stats 동시 조회 수 제한 + 마지막 정상값
 
-**Why:** Docker Desktop은 서버가 아닌 대다수 사용자(맥, 윈도우)의 기본 설치 경로라서, 지금은 dockviz 사용자층의 상당수에게 이 카테고리가 아예 안 보인다.
+semaphore로 동시에 최대 8~16개만 `FetchStats`를 호출하고, 조회에 실패한 컨테이너는
+`-` 대신 마지막 정상값을 흐리게 표시합니다(history에는 여전히 넣지 않음).
 
-**Pros:** `ContainerLogs`로 스트리밍하며 바이트를 세는 방식은 어떤 전송 방식(원격 `DOCKER_HOST` 포함)에도 통하고, 로컬 파일시스템 접근이 아예 필요없다.
+### T-010: event 기반 즉시 갱신
 
-**Cons:** 크기 측정을 위해 로그 전체를 스트리밍하는 건 `stat()` 한 번보다 훨씬 비싸다. 특히 로그 히스토리가 큰 컨테이너면 더 그렇다. 패널의 정기 auto-refresh(`fetchDiskUsageCmd`)에 얹기보다, 컨테이너별로 사용자가 명시적으로 요청할 때만 도는 별도 트리거가 필요할 것.
+`die`, `oom`, `kill`, `start` event가 오면 다음 tick을 기다리지 않고 조회를
+시작합니다. 진행 중 조회가 있으면 건너뛰는 기존 규칙을 그대로 따릅니다.
 
-**Context:** Container Logs 카테고리 자체와 같은 변경에서 함께 논의됨. v1에서는 의도적으로 범위 밖으로 뺐다 — 로컬 stat이 비용 없이 이 수치를 얻는 유일한 방법이고, 이 프로젝트가 명시한 주 타겟인 네이티브 리눅스 서버 운영자에게는 지금도 잘 동작한다.
+### T-011 ~ T-015: 원인까지 보이는 Problems
 
-**Status:** 연기
+- **T-011:** `die` event 시각 기준 `ContainerLogs(Since, Until, Tail)`로 전후 로그를
+  가져와 문제 상세 아래에 표시합니다. 비용이 있으므로 상세를 열 때만 조회합니다.
+- **T-012:** 문제 상세에 해당 컨테이너의 CPU/MEM sparkline과 limit 대비 비율을
+  함께 그립니다. 컨테이너가 사라진 뒤에도 보이도록 history를 문제와 함께 보관합니다.
+- **T-013:** `health_status` event와 `ContainerInspect().State.Health`를 읽어
+  unhealthy를 warning, unhealthy 지속을 critical로 분류합니다.
+- **T-014:** Compose context의 `Dependents`를 이용해 문제가 난 service에 의존하는
+  service를 "영향 받는 service"로 표시합니다.
+- **T-015:** project 요약과 Noisy neighbor 판정을 컨테이너가 아니라 service 단위로
+  합산합니다.
 
----
+### T-016 ~ T-018: headless 모드
 
-## T-005: 자동화된 테스트/린트 워크플로 없음
+- **T-016:** Cobra 서브커맨드 `problems`, `df`를 추가하고 TUI 없이 한 번 조회해 JSON
+  또는 표로 출력합니다. CPU/MEM 판정에는 history가 필요하므로 `--sample 10s` 같은
+  짧은 수집 시간을 둡니다.
+- **T-017:** 출력과 함께 종료 코드로 최고 severity를 알립니다.
+- **T-018:** `internal/tui/problems.go`의 상수 기준값을 설정 구조체로 옮기고, 설정
+  파일과 플래그로 덮어쓸 수 있게 합니다.
 
-**What:** `.github/workflows/`에는 `release.yml`(main push/태그 시 빌드+배포)만 있다. PR 머지 전에 `go build`, `go vet`, `go test ./...`를 실행하는 게 아무것도 없다.
+### T-019 ~ T-021: 정리 기능
 
-**Why:** Local Volumes 프룬 회수량 불일치 버그(`docs/troubleshooting.md#12`)가 원래 Disk Usage 패널 PR에 그대로 실려서 한 릴리스 주기 동안 아무도 모르고 지나갔다. 사실 `go test ./...`가 있었어도 이건 못 잡았을 것 — 실제 데몬과 통신하는 통합 버그인데, 진짜 Docker API를 호출하는 `Client`의 메서드들은 커버리지 0%다(테스트되는 건 사실상 `DemoClient`뿐). 그래도 최소한 `go vet`과 기존 유닛 테스트가 PR마다 자동으로 돌면, 커버되는 범위 안에서의 회귀는 누군가 로컬에서 기억해서 돌리는 것에 기대지 않고 잡을 수 있다.
+- **T-019:** prune 확인창에 대상 목록(이름, 크기)을 보여줍니다. Docker API에는
+  dry-run이 없으므로 `DiskUsage` 결과에서 대상을 계산합니다. 표시 목록과 실제 대상이
+  같아야 한다는 기존 불변식을 그대로 지킵니다.
+- **T-020:** Disk Usage에서 Local Volumes 행을 열면 볼륨 목록을 보여주고 하나씩
+  삭제합니다. 데이터 손실 경고는 그대로 둡니다.
+- **T-021:** inspect의 `HostConfig.LogConfig`에 `max-size`가 없는 컨테이너를 찾아
+  Problems에 info로 올리고, compose `logging` 설정 예시를 권장 조치로 보여줍니다.
 
-**Pros:** `release.yml`이 깨진 커밋으로 이미 태그를 찍고 배포해버리기 전에, 머지 전 단계에서 빌드 실패와 유닛 테스트 회귀를 잡는다.
+### T-022, T-023
 
-**Cons:** `Client`에 대한 실제 데몬 통합 테스트까지 커버하려면(T-004의 비용 문제, `docs/testing-container-log-disk-usage.md`에 적은 0% 커버리지 갭 참고) `services: docker` 같은 GitHub Actions 러너 설정이 추가로 필요하다.
+- **T-022:** 목록에 `/` 검색과 정렬 키를 추가합니다.
+- **T-023:** `--context <name>`으로 Docker context의 endpoint와 TLS 설정을 사용합니다.
 
-**Context:** 지금까지 머지된 PR(#6~#11)은 전부 작성자가 로컬에서 `go build`/`go test`를 돌려본 뒤 push하는 데 의존했다. 메인테이너가 한 명인 지금 규모에선 그럭저럭 괜찮지만, 자동 릴리스(`release.yml`, #10에서 머지)는 `main`에 올라온 걸 즉시 배포한다 — "머지됨"과 "PyPI/APT/GitHub Releases에 배포됨" 사이에 아무 게이트가 없다.
+### T-002: 이벤트 필터 UI — 취소
 
-**Status:** 연기
+지원이 끝난 Events 탭을 대상으로 한 항목입니다. Problems 패널이 이미 event를 장애
+관련 신호로 걸러서 보여줍니다.

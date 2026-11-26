@@ -70,3 +70,81 @@ func TestCategoryLabel(t *testing.T) {
 		t.Errorf("categoryLabel(%q) = %q, want the key itself as fallback", "unknown", got)
 	}
 }
+
+func newTestModel() Model {
+	return Model{
+		docker:     docker.NewDemoClient(),
+		history:    make(map[string][]float64),
+		memHistory: make(map[string][]float64),
+	}
+}
+
+func TestDataMsgDropsStaleResults(t *testing.T) {
+	m := newTestModel()
+	m.fetchSeq = 2
+
+	newer := dataMsg{seq: 2, containers: []docker.ContainerInfo{
+		{ID: "a", Status: "running", CPUPerc: 50, MemMB: 200, StatsOK: true},
+	}}
+	older := dataMsg{seq: 1, containers: []docker.ContainerInfo{
+		{ID: "a", Status: "running", CPUPerc: 10, MemMB: 100, StatsOK: true},
+	}}
+
+	next, _ := m.Update(newer)
+	m = next.(Model)
+	next, _ = m.Update(older)
+	m = next.(Model)
+
+	if got := m.containers[0].CPUPerc; got != 50 {
+		t.Errorf("stale result overwrote newer data: CPUPerc = %v, want 50", got)
+	}
+	if h := m.history["a"]; len(h) != 1 || h[0] != 50 {
+		t.Errorf("history = %v, want [50] (stale sample must not be appended)", h)
+	}
+	if m.fetchInFlight() {
+		t.Error("fetchInFlight() = true after the latest fetch was applied")
+	}
+}
+
+func TestDataMsgSkipsFailedStatsSamples(t *testing.T) {
+	m := newTestModel()
+	m.fetchSeq = 1
+
+	next, _ := m.Update(dataMsg{seq: 1, containers: []docker.ContainerInfo{
+		{ID: "ok", Status: "running", CPUPerc: 30, MemMB: 64, StatsOK: true},
+		{ID: "failed", Status: "running"}, // stats call failed: zero values, StatsOK=false
+	}})
+	m = next.(Model)
+
+	if h := m.history["ok"]; len(h) != 1 {
+		t.Errorf("history[ok] = %v, want one sample", h)
+	}
+	if h, ok := m.history["failed"]; ok {
+		t.Errorf("history[failed] = %v, want no entry for a failed sample", h)
+	}
+	if h, ok := m.memHistory["failed"]; ok {
+		t.Errorf("memHistory[failed] = %v, want no entry for a failed sample", h)
+	}
+}
+
+func TestTickSkipsFetchWhileInFlight(t *testing.T) {
+	m := newTestModel()
+	m.fetchSeq = 3
+	m.appliedSeq = 2 // fetch #3 still running
+
+	next, cmd := m.Update(tickMsg{})
+	m = next.(Model)
+	if m.fetchSeq != 3 {
+		t.Errorf("fetchSeq = %d, want 3 (tick must not issue a new fetch while one is in flight)", m.fetchSeq)
+	}
+	if cmd == nil {
+		t.Error("tick returned nil cmd, want the next tick to be scheduled")
+	}
+
+	m.appliedSeq = 3
+	next, _ = m.Update(tickMsg{})
+	m = next.(Model)
+	if m.fetchSeq != 4 {
+		t.Errorf("fetchSeq = %d, want 4 once the previous fetch completed", m.fetchSeq)
+	}
+}
