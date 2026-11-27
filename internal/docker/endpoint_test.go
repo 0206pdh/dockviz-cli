@@ -309,7 +309,9 @@ func TestResolveEndpointTLS(t *testing.T) {
 func TestClientOptsContextIgnoresDockerHostEnv(t *testing.T) {
 	t.Setenv("DOCKER_HOST", "tcp://10.9.9.9:2375")
 
-	ep := Endpoint{Host: "unix:///tmp/ctx.sock", Source: "context x", Context: "x"}
+	// tcp:// rather than unix:// so the test also runs on Windows, where the
+	// SDK rejects unix sockets ("protocol not available").
+	ep := Endpoint{Host: "tcp://127.0.0.1:23750", Source: "context x", Context: "x"}
 	opts, err := clientOpts(ep)
 	if err != nil {
 		t.Fatal(err)
