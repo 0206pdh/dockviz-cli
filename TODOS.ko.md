@@ -58,7 +58,23 @@ dockviz의 고도화 로드맵과 남은 작업입니다. 2026-11-26, v0.8.0 기
 | T-019 | prune 대상 미리보기 | 확인창에서 실제로 지워질 이미지/볼륨 목록과 크기를 보여줌 |
 | T-020 | 볼륨 단위 삭제 | 카테고리 전체 prune 대신 볼륨 목록(크기, 라벨, 마지막 사용 컨테이너)에서 하나씩 삭제 |
 | T-021 | 로그 rotation 권장 | `max-size`가 없는 컨테이너를 찾아 compose `logging` 설정 예시 제시 |
-| T-004 | 원격에서도 동작하는 Container Logs 크기 측정 | Docker Desktop/원격에서도 로그 용량 확인 (비용이 커서 요청 시에만) |
+| T-004 | 원격에서도 동작하는 Container Logs 크기 측정 | T-028(helper 측정 경로)로 대체 예정 |
+
+### 잔존 리소스 탐지
+
+S3 미완료 multipart upload처럼 보이지 않게 남는 Docker 리소스를 찾습니다. 판정 규칙,
+환경별 차이, Phase별 완료 기준은 [docs/leftovers-plan.ko.md](docs/leftovers-plan.ko.md)에
+있습니다.
+
+| Phase | ID | 항목 | 효과 |
+|---|---|---|---|
+| 0 | T-023 | Docker context 지원 | Docker Desktop, Colima, OrbStack에서 설정 없이 연결 |
+| 1 | T-024 | 실측 시나리오 (개발자 검증용, Go) | 판정 규칙이 실제 API 필드로 계산되는지 환경별로 확정 |
+| 2 | T-025 | 탐지 로직 (읽기 전용, 순수 함수) | orphan 컨테이너, 빠진 볼륨, 주인 없는 볼륨, 익명 볼륨, 오래 멈춘 컨테이너 판정 |
+| 3 | T-026 | Disk Usage Leftovers 행과 목록 화면 | 판정 이유와 확실도까지 한 화면에서 확인 |
+| 4 | T-027 | 개별 삭제 + 통합 테스트(T-007) | 확인창, 삭제 직전 재조회, force 금지. CI에서 실제 daemon 검증 |
+| 5 | T-028 | VM/원격 측정 경로(helper)와 보고 전용 항목 | `local` 로그 드라이버, Docker Desktop 로그 크기, buildx 캐시, 네트워크 주소 풀, overlay2 차이 |
+| 6 | T-029 | 정리 정책 조정 (선택) | 기준 일수 설정, 오탐 반영 |
 
 ### 그 밖의 항목
 
@@ -68,7 +84,6 @@ dockviz의 고도화 로드맵과 남은 작업입니다. 2026-11-26, v0.8.0 기
 | T-003 | `--demo`의 정해진 문제 시나리오 | daemon 없이 모든 Problems 신호를 예측 가능한 순서로 재생 (스크린샷/GIF용) |
 | T-008 | 크로스 플랫폼 검증 시나리오 | PowerShell 전용 `scenarios/`를 POSIX shell 또는 Go로 이식 |
 | T-022 | 목록 검색/정렬 | `/`로 이름 필터, CPU/MEM/크기 기준 정렬 |
-| T-023 | Docker context 지원 | `--context`로 `docker context`에 등록된 endpoint 선택 |
 
 ### 권장 순서
 
@@ -96,6 +111,8 @@ OOM kill → restart loop → 회복, 메모리 증가 곡선, storage offender 
 냅니다.
 
 ### T-004: 원격에서도 동작하는 Container Logs 크기 측정
+
+> T-028의 helper 측정 경로로 대체할 예정입니다. 아래는 원래 계획입니다.
 
 지금은 `LogPath`를 로컬에서 stat하므로 Docker Desktop과 원격 `DOCKER_HOST`에서는
 unavailable입니다. `ContainerLogs`를 스트리밍해 바이트를 세면 어디서나 동작하지만
@@ -173,7 +190,7 @@ semaphore로 동시에 최대 8~16개만 `FetchStats`를 호출하고, 조회에
 ### T-022, T-023
 
 - **T-022:** 목록에 `/` 검색과 정렬 키를 추가합니다.
-- **T-023:** `--context <name>`으로 Docker context의 endpoint와 TLS 설정을 사용합니다.
+- **T-023:** `--context <name>`, `DOCKER_CONTEXT`, `config.json`의 `currentContext`에서 Docker context의 endpoint와 TLS 설정을 사용합니다. 잔존 리소스 탐지의 Phase 0이며 상세는 [docs/leftovers-plan.ko.md](docs/leftovers-plan.ko.md#phase-0-docker-context-지원-t-023)에 있습니다.
 
 ### T-002: 이벤트 필터 UI — 취소
 

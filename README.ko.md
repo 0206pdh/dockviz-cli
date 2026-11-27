@@ -130,6 +130,7 @@ dockviz                                          # 로컬 daemon. compose.yaml�
 dockviz -f compose.yaml -f compose.override.yaml # Compose 파일 명시
 dockviz --demo                                   # 가상 데이터. Docker daemon 불필요
 dockviz --host tcp://192.168.1.100:2375          # 원격 daemon (또는 DOCKER_HOST 사용)
+dockviz --context colima                         # docker context 지정 (기본: 현재 context)
 dockviz --version                                # 빌드 버전 출력
 ```
 
@@ -168,8 +169,18 @@ Compose context는 read-only이며 영향 범위를 설명하는 데 씁니다.
 
 ## Docker 연결
 
-실제 client는 `DOCKER_HOST`와 Docker의 표준 환경 설정을 사용하며, `--host`를
-지정하면 `DOCKER_HOST`보다 우선합니다.
+연결할 daemon은 `docker` CLI와 같은 순서로 정합니다.
+
+1. `--context` 플래그
+2. `--host` 플래그
+3. `DOCKER_HOST`
+4. `DOCKER_CONTEXT`
+5. `docker context use`로 정한 현재 context (`~/.docker/config.json`의 `currentContext`)
+6. OS 기본 socket
+
+그래서 Docker Desktop(`desktop-linux`), Colima, OrbStack처럼 socket이 기본 위치에
+없는 환경도 `docker` 명령이 동작하면 별도 설정 없이 연결됩니다. `--host`와
+`--context`는 함께 쓸 수 없고, `ssh://` endpoint context는 아직 지원하지 않습니다.
 
 현재 사용자가 Docker socket 또는 endpoint에 접근할 수 있어야 합니다. 인증 없는
 원격 Docker TCP socket은 원격 root 권한과 같으므로 TLS와 네트워크 접근 제어를
@@ -217,7 +228,7 @@ CI(`.github/workflows/ci.yml`)는 모든 PR과 `main` push에서 gofmt, Linux/Wi
 
 ```text
 main.go
-  └─ cmd/root.go                 Cobra 플래그: --demo, --host, -f/--compose-file, --version
+  └─ cmd/root.go                 Cobra 플래그: --demo, --host, --context, -f/--compose-file, --version
       └─ internal/tui/start.go
           ├─ docker.NewClient() / docker.NewDemoClient()   (DockerClient interface)
           ├─ compose.Load()                                (선택적 Compose context)

@@ -132,6 +132,7 @@ dockviz                                          # local daemon; auto-loads comp
 dockviz -f compose.yaml -f compose.override.yaml # explicit Compose files
 dockviz --demo                                   # simulated data, no Docker daemon required
 dockviz --host tcp://192.168.1.100:2375          # remote daemon (or set DOCKER_HOST)
+dockviz --context colima                         # pick a docker context (default: current context)
 dockviz --version                                # print the build version
 ```
 
@@ -171,8 +172,12 @@ Compose context is read-only and is used to explain impact:
 
 ## Docker connection
 
-The live client uses `DOCKER_HOST` and Docker's normal environment settings.
-The `--host` flag overrides `DOCKER_HOST` when supplied.
+The daemon endpoint is chosen with the same precedence as the `docker` CLI:
+`--context`, then `--host`, then `DOCKER_HOST`, then `DOCKER_CONTEXT`, then the
+current context from `docker context use`, then the platform default socket.
+Docker Desktop (`desktop-linux`), Colima, and OrbStack therefore work without
+extra configuration whenever `docker` itself works. `--host` and `--context`
+are mutually exclusive, and `ssh://` context endpoints are not supported yet.
 
 The daemon must allow the current user to access its socket or endpoint. A
 remote TCP endpoint should be protected with appropriate TLS/network controls;
@@ -223,7 +228,7 @@ and `go build`/`go test` on all three OSes for every pull request and push to
 
 ```text
 main.go
-  └─ cmd/root.go                 Cobra flags: --demo, --host, -f/--compose-file, --version
+  └─ cmd/root.go                 Cobra flags: --demo, --host, --context, -f/--compose-file, --version
       └─ internal/tui/start.go
           ├─ docker.NewClient() / docker.NewDemoClient()   (DockerClient interface)
           ├─ compose.Load()                                (optional Compose context)

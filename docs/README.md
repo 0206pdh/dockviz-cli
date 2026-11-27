@@ -11,6 +11,7 @@
 | [validation.ko.md](validation.ko.md) | 실제 daemon 검증 결과(volume prune, VHDX, 이미지, stats 병렬화), 시나리오 실행법, 수동 체크리스트 | 동작 근거나 재현 방법이 필요할 때 |
 | [troubleshooting.ko.md](troubleshooting.ko.md) | 개발 중 만난 버그의 증상, 원인, 해결 | 비슷한 문제를 만났을 때 |
 | [TODOS.ko.md](../TODOS.ko.md) | 고도화 로드맵과 남은 작업 | 다음에 무엇을 할지 볼 때 |
+| [leftovers-plan.ko.md](leftovers-plan.ko.md) | 잔존 리소스 탐지의 사실 확인, 판정 규칙, Phase 계획 | 잔존 리소스 기능을 구현하거나 검토할 때 |
 
 릴리스 노트는 [GitHub Releases](https://github.com/0206pdh/dockviz-cli/releases)에
 있습니다. 스크린샷 원본은 [images/](images/)에 있습니다.

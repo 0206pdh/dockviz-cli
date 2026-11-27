@@ -44,7 +44,7 @@ func main() {
 		fatalf("runs must be >= 1")
 	}
 
-	client, err := dockerd.NewClient("")
+	client, err := dockerd.NewClient("", "")
 	if err != nil {
 		fatalf("%v", err)
 	}
