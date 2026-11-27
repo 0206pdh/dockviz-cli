@@ -8,6 +8,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.11.0
 	github.com/compose-spec/compose-go/v2 v2.13.0
 	github.com/docker/docker v28.0.4+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/spf13/cobra v1.8.1
 )
 
@@ -21,7 +22,6 @@ require (
 	github.com/charmbracelet/x/windows v0.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

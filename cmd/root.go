@@ -12,6 +12,7 @@ import (
 
 var demoMode bool
 var dockerHost string
+var dockerContext string
 var composeFiles []string
 
 // rootCmd is the base command. Its Version field is set by Execute() before
@@ -30,11 +31,13 @@ Run with --demo to preview the dashboard without a running Docker daemon.`,
   dockviz -f compose.yaml -f compose.override.yaml
   dockviz --demo                            # run with simulated data (no Docker required)
   dockviz --host tcp://192.168.1.100:2375   # connect to a remote Docker daemon
+  dockviz --context colima                  # use a docker context (default: current context)
   dockviz --version                         # print version and exit`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return tui.Start(tui.StartOptions{
 			Demo:         demoMode,
 			Host:         dockerHost,
+			Context:      dockerContext,
 			Version:      cmd.Version,
 			ComposeFiles: composeFiles,
 		})
@@ -43,7 +46,9 @@ Run with --demo to preview the dashboard without a running Docker daemon.`,
 
 func init() {
 	rootCmd.Flags().BoolVar(&demoMode, "demo", false, "Run with simulated data (no Docker daemon required)")
-	rootCmd.Flags().StringVar(&dockerHost, "host", "", "Docker daemon socket or host (e.g. tcp://192.168.1.100:2375). Overrides DOCKER_HOST env var.")
+	rootCmd.Flags().StringVar(&dockerHost, "host", "", "Docker daemon socket or host (e.g. tcp://192.168.1.100:2375). Overrides DOCKER_HOST and the current docker context.")
+	rootCmd.Flags().StringVar(&dockerContext, "context", "", "Docker context name (see `docker context ls`). Overrides DOCKER_HOST, DOCKER_CONTEXT, and the current context.")
+	rootCmd.MarkFlagsMutuallyExclusive("host", "context")
 	rootCmd.Flags().StringArrayVarP(&composeFiles, "compose-file", "f", nil, "Compose file path. Can be used multiple times. Defaults to compose.yaml/docker-compose.yml discovery.")
 }
 

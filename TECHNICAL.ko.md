@@ -101,7 +101,7 @@ Cmd를 실행하고 결과 메시지를 다시 `Update`로 보냅니다. 따라�
 
 ```text
 main.go                 version 변수(-ldflags 주입)만 두는 최소 진입점
-cmd/root.go             Cobra 플래그: --demo, --host, -f/--compose-file, --version
+cmd/root.go             Cobra 플래그: --demo, --host, --context, -f/--compose-file, --version
 internal/tui/           Model·Update·View, 문제 판정, 비동기 command
 internal/docker/        Docker SDK 접근과 도메인 타입 변환, DemoClient
 internal/compose/       Compose 파일 탐색·해석
@@ -456,6 +456,7 @@ go run . --demo
 | 테스트 파일 | 검증 대상 |
 |---|---|
 | `internal/docker/containers_test.go` | CPU delta, OnlineCPUs fallback, zero system delta, 포트 포맷/중복 제거 |
+| `internal/docker/endpoint_test.go` | daemon endpoint 우선순위(`--context`/`--host`/`DOCKER_HOST`/`DOCKER_CONTEXT`/현재 context), context 디렉터리 해시, TLS 파일, 잘못된 설정 오류, context가 `DOCKER_HOST`에 덮이지 않음 |
 | `internal/docker/diskusage_test.go` | dangling 판정, 크기 변환/포맷, 로컬 host 판정, VHDX 경로, 로그 파일 크기, demo prune |
 | `internal/compose/context_test.go` | Compose 해석, 의존성/역의존성, 지정 파일 없음, 자동 탐색 실패 |
 | `internal/tui/problems_test.go` | event/리소스/project/storage 판정 |

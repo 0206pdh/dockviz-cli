@@ -15,19 +15,21 @@ import (
 type StartOptions struct {
 	Demo         bool
 	Host         string
+	Context      string
 	Version      string
 	ComposeFiles []string
 }
 
 // Start connects to Docker (or uses demo data), builds the model, and runs the TUI.
-// Demo mode runs without a live Docker daemon. Host overrides DOCKER_HOST when
-// non-empty (e.g. "tcp://192.168.1.100:2375").
+// Demo mode runs without a live Docker daemon. Host and Context mirror the
+// docker CLI's --host and --context flags; when both are empty the endpoint
+// comes from DOCKER_HOST, DOCKER_CONTEXT, or the current docker context.
 func Start(opts StartOptions) error {
 	var dc docker.DockerClient
 	if opts.Demo {
 		dc = docker.NewDemoClient()
 	} else {
-		real, err := docker.NewClient(opts.Host)
+		real, err := docker.NewClient(opts.Host, opts.Context)
 		if err != nil {
 			return fmt.Errorf("docker: %w", err)
 		}
