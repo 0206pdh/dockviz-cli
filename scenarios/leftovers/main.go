@@ -72,7 +72,10 @@ type Report struct {
 	Environment map[string]any `json:"environment"`
 	Steps       []Step         `json:"steps"`
 	Checks      []Check        `json:"checks"`
-	Snapshot    Snapshot       `json:"snapshot"`
+	// Detected is what dockviz's own ListLeftovers returned for this daemon
+	// with the final compose file (alive-v2.yaml) as scope.
+	Detected []dockerd.Leftover `json:"detected"`
+	Snapshot Snapshot           `json:"snapshot"`
 }
 
 type Step struct {
@@ -124,6 +127,8 @@ type runner struct {
 	preImages  map[string]bool
 	hasCompose bool
 	hasBuildx  bool
+	host       string
+	dctx       string
 }
 
 func main() {
@@ -160,6 +165,8 @@ func main() {
 		report:    &Report{GeneratedAt: time.Now().UTC(), Host: cli.DaemonHost(), Endpoint: ep.Source},
 		anonVols:  map[string]bool{},
 		preImages: map[string]bool{},
+		host:      *host,
+		dctx:      *dctx,
 	}
 	r.hasCompose = r.cliWorks("compose", "version")
 	r.hasBuildx = r.cliWorks("buildx", "version")
@@ -182,6 +189,7 @@ func main() {
 	r.createAll()
 	r.snapshot()
 	r.check()
+	r.detect()
 
 	path := *out
 	if path == "" {
@@ -614,6 +622,48 @@ func (r *runner) check() {
 	add("logs.driver", "Which log driver do containers use, and is LogPath empty?",
 		fmt.Sprintf("drivers=%v, empty LogPath=%d/%d", logs, emptyLogPath, len(s.Inspects)),
 		fmt.Sprintf("daemon default=%v", r.report.Environment["loggingDriver"]))
+}
+
+// detect runs dockviz's ListLeftovers against the live daemon, the same call
+// the TUI will make, and prints what it found.
+func (r *runner) detect() {
+	r.step("dockviz ListLeftovers (scope: alive-v2.yaml)", func() (string, error) {
+		dc, err := dockerd.NewClient(r.host, r.dctx)
+		if err != nil {
+			return "", err
+		}
+		defer dc.Close()
+		ls, err := dc.ListLeftovers(&dockerd.ComposeScope{
+			Project:  projectAlive,
+			Services: map[string]bool{"web": true},
+			Volumes:  map[string]bool{"data": true},
+		})
+		if err != nil {
+			return "", err
+		}
+		r.report.Detected = ls
+		var b strings.Builder
+		for _, l := range ls {
+			size := "size?"
+			if l.SizeKnown {
+				size = fmt.Sprintf("%.1fMB", l.SizeMB)
+			}
+			held := ""
+			if len(l.HeldBy) > 0 {
+				held = " held by " + strings.Join(l.HeldBy, ",")
+			}
+			fmt.Fprintf(&b, "  %-8s %-26s %-38s %8s removable=%v%s\n", l.Confidence, l.Kind, short40(l.Name), size, l.Removable, held)
+		}
+		fmt.Print(b.String())
+		return b.String(), nil
+	})
+}
+
+func short40(s string) string {
+	if len(s) > 38 {
+		return s[:35] + "..."
+	}
+	return s
 }
 
 func volumeEvidence(v *volume.Volume, usage func(*volume.Volume) string) string {

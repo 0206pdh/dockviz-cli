@@ -46,7 +46,7 @@ you need a compact, continuously updating view of several resources at once:
 | Containers | Live CPU/MEM, compose/project summary, p95 summaries, limits, detail, logs, and history chart |
 | Images | Local image tags and safe tag/image removal |
 | Problems | OOM/restart events, high CPU, memory pressure/growth, missing limits, storage offenders, and daemon disconnects |
-| Disk Usage | Docker storage breakdown and category-level prune actions |
+| Disk Usage | Docker storage breakdown, category-level prune actions, and a Leftovers list of resources left behind |
 
 Signal definitions, severity thresholds, and exactly what each prune action
 removes are in the [reference (Korean)](docs/reference.ko.md).
@@ -163,7 +163,7 @@ Compose context is read-only and is used to explain impact:
 | `q` / `Ctrl+C` | Quit |
 | `Tab` | Switch between Containers, Images, Problems, and Disk Usage |
 | `↑` / `k`, `↓` / `j` | Move up / down |
-| `Enter` | Open container detail (Containers) or problem detail (Problems) |
+| `Enter` | Open container detail (Containers), problem detail (Problems), or the leftovers list (Leftovers row in Disk Usage) |
 | `Esc` | Go back or close an overlay |
 | `d` | Delete selected container/image, or prune the selected disk category |
 | `l` | Open live logs for the selected container |

@@ -48,7 +48,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.activePanel != PanelDiskUsage && m.activePanel != PanelProblems {
 			return m, nil
 		}
-		return m, tea.Batch(fetchDiskUsageCmd(m.docker), diskUsageRefreshCmd())
+		return m, tea.Batch(m.fetchDiskUsage(), diskUsageRefreshCmd())
 
 	// Fresh Docker data arrived
 	case dataMsg:
@@ -132,6 +132,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.diskUsageLoaded = true
 		m.diskUsageErr = nil
 		m.diskUsage = msg.info
+		m.leftoversLoaded = true
+		m.leftoversErr = msg.leftoversErr
+		if msg.leftoversErr == nil {
+			m.leftovers = msg.leftovers
+		}
+		m.leftoverCursor = clamp(m.leftoverCursor, 0, len(m.leftovers)-1)
 		return m, nil
 
 	// A prune action (images/containers/volumes/build cache) finished
@@ -139,10 +145,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pruning = false
 		if msg.err != nil {
 			m.diskUsageErr = msg.err
-			return m, fetchDiskUsageCmd(m.docker)
+			return m, m.fetchDiskUsage()
 		}
 		m.pruneResultMsg = fmt.Sprintf("%s: freed %s", categoryLabel(msg.category), docker.FormatSize(msg.freedMB))
-		return m, fetchDiskUsageCmd(m.docker)
+		return m, m.fetchDiskUsage()
 
 	// Keyboard input
 	case tea.KeyMsg:
@@ -218,6 +224,33 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// --- Leftovers view key handling (read-only list) ---
+	if m.activeView == ViewLeftovers {
+		switch {
+		case keyMatches(msg, km.Quit):
+			if m.logCancel != nil {
+				m.logCancel()
+			}
+			if m.eventCancel != nil {
+				m.eventCancel()
+			}
+			return m, tea.Quit
+		case keyMatches(msg, km.Back):
+			m.activeView = ViewDashboard
+		case keyMatches(msg, km.Up):
+			if m.leftoverCursor > 0 {
+				m.leftoverCursor--
+			}
+		case keyMatches(msg, km.Down):
+			if m.leftoverCursor < len(m.leftovers)-1 {
+				m.leftoverCursor++
+			}
+		case keyMatches(msg, km.Refresh):
+			return m, m.fetchDiskUsage()
+		}
+		return m, nil
+	}
+
 	// --- Log view key handling ---
 	if m.activeView == ViewLogs {
 		switch {
@@ -284,7 +317,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activePanel == PanelDiskUsage || m.activePanel == PanelProblems {
 			m.pruneResultMsg = ""
 			m.diskUsageErr = nil
-			return m, tea.Batch(fetchDiskUsageCmd(m.docker), diskUsageRefreshCmd())
+			return m, tea.Batch(m.fetchDiskUsage(), diskUsageRefreshCmd())
 		}
 
 	case keyMatches(msg, km.Refresh):
@@ -301,7 +334,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.nextFetch(), waitForEventCmd(m.eventCh))
 		}
 		if m.activePanel == PanelDiskUsage || m.activePanel == PanelProblems {
-			return m, fetchDiskUsageCmd(m.docker)
+			return m, m.fetchDiskUsage()
 		}
 		return m, m.nextFetch()
 
@@ -315,6 +348,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if m.activePanel == PanelProblems && len(m.problems()) > 0 {
 			m.activeView = ViewDetail
+		}
+		if m.activePanel == PanelDiskUsage && m.cursor == leftoversRowIndex() {
+			m.leftoverCursor = clamp(m.leftoverCursor, 0, len(m.leftovers)-1)
+			m.activeView = ViewLeftovers
 		}
 
 	case keyMatches(msg, km.Delete):
@@ -331,6 +368,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.pendingDeleteID = ref
 			m.confirmDelete = true
+		}
+		if m.activePanel == PanelDiskUsage && m.cursor == leftoversRowIndex() {
+			m.diskUsageErr = fmt.Errorf("leftovers are not pruned as a category; press Enter to review each item")
+			return m, nil
 		}
 		if m.activePanel == PanelDiskUsage && m.diskUsageLoaded {
 			rows := diskUsageRows(m.diskUsage)
@@ -468,7 +509,8 @@ func (m Model) activeListLen() int {
 	case PanelProblems:
 		return len(m.problems())
 	case PanelDiskUsage:
-		return len(diskUsageRows(m.diskUsage))
+		// Prune categories plus the Leftovers row.
+		return len(diskUsageDefs) + 1
 	}
 	return 0
 }

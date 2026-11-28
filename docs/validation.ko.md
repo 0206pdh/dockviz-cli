@@ -428,3 +428,33 @@ go run ./scenarios/leftovers --cleanup       # --keep으로 남긴 리소스 정
 | 네트워크 | 전체 7개(기본 3개 + 생성 4개) | 주소 풀 경고는 개수와 subnet으로 판정 |
 | 로그 드라이버 | 4개 컨테이너 모두 `local`, `LogPath` 모두 빈 값 | 현재 Container Logs는 Docker Desktop에서 측정 불가(Phase 5) |
 
+### 2026-11-28, Phase 2 탐지 로직 실측
+
+시나리오의 `dockviz ListLeftovers` 단계가 리소스를 만든 직후 dockviz의 실제 탐지
+함수를 호출합니다(scope: 마지막 compose 파일 `alive-v2.yaml`). 24단계 모두 성공.
+
+| 판정 | 종류 | 대상 | 크기 | 삭제 가능 |
+|---|---|---|---|---|
+| certain | compose-dropped-volume | `dvzleft_cache` | 4.0MB | 아니오 (orphan `dvzleft-worker-1`이 사용 중) |
+| certain | anonymous-volume | 64자 hex 볼륨 | 3.0MB | 예 |
+| certain | compose-oneoff | `dvzleft-web-run-*` | 0.0MB | 예 |
+| certain | compose-orphan | `dvzleft-worker-1` | 0.0MB | 아니오 (실행 중) |
+| likely | compose-ownerless-volume | `dvzgone_dbdata` | 4.0MB | 예 |
+| report | buildx-builder-cache | `dvz-leftovers` | 8.4MB | 아니오 (안내만) |
+
+방금 멈춘 `dvz-leftovers-stopped`는 기준(14일) 미만이라 나오지 않는 것이 맞습니다.
+현재 프로젝트가 쓰는 `dvzleft_data`와 실행 중인 `dvzleft-web-1`도 나오지 않습니다.
+
+### 2026-11-28, Phase 3 화면 확인
+
+`go run ./scenarios/leftovers --keep`으로 리소스를 남긴 뒤 실제 client로 Disk Usage,
+Leftovers 목록, Local Volumes prune 확인창을 렌더링해 확인했습니다.
+
+- Disk Usage `Leftovers` 행: TOTAL 6, ACTIVE 3, SIZE 19 MB, RECLAIMABLE 7 MB,
+  `certain 4 · likely 1 · info 1`
+- Leftovers 목록: 위 Phase 2 표와 같은 6개 항목, `dvzleft_cache`는
+  `held by dvzleft-worker-1`
+- Local Volumes 확인창: `1 of these (4 MB) belong to Compose projects`
+  (`dvzgone_dbdata`)
+- `--cleanup` 후 라벨 기준 컨테이너/볼륨/네트워크 0개
+

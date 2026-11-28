@@ -125,6 +125,7 @@ func (m Model) problems() []Problem {
 	out = append(out, m.resourceProblems()...)
 	out = append(out, m.projectProblems()...)
 	out = append(out, m.storageProblems()...)
+	out = append(out, m.leftoverProblems(time.Now())...)
 	sort.SliceStable(out, func(i, j int) bool {
 		if severityRank(out[i].Severity) != severityRank(out[j].Severity) {
 			return severityRank(out[i].Severity) < severityRank(out[j].Severity)

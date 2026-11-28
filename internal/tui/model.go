@@ -39,6 +39,8 @@ const (
 	ViewDetail
 	ViewLogs
 	ViewChart
+	// ViewLeftovers lists leftover resources (opened from Disk Usage).
+	ViewLeftovers
 )
 
 // tickMsg is sent on each refresh interval.
@@ -53,10 +55,15 @@ type dataMsg struct {
 	err        error
 }
 
-// diskUsageMsg carries a freshly fetched disk usage breakdown back to Update.
+// diskUsageMsg carries a freshly fetched disk usage breakdown, and the
+// leftover resources detected at the same time, back to Update.
 type diskUsageMsg struct {
 	info docker.DiskUsageInfo
 	err  error
+	// leftovers is nil with leftoversErr set when detection failed; a
+	// failure there never hides the disk usage breakdown.
+	leftovers    []docker.Leftover
+	leftoversErr error
 }
 
 // diskUsageRefreshMsg refreshes the relatively expensive system/df query
@@ -95,6 +102,12 @@ type Model struct {
 	diskUsageErr    error  // last DiskUsage refresh error; does not blank the dashboard
 	pruning         bool   // true while a prune action is in flight
 	pruneResultMsg  string // transient "freed N MB" message shown after a prune completes
+
+	// Leftover resources (Disk Usage -> Leftovers), refreshed with disk usage.
+	leftovers       []docker.Leftover
+	leftoversLoaded bool
+	leftoversErr    error
+	leftoverCursor  int
 
 	// Navigation
 	activePanel Panel
@@ -263,13 +276,23 @@ func fetchDataCmd(dc docker.DockerClient, seq uint64) tea.Cmd {
 	}
 }
 
-// fetchDiskUsageCmd fetches the disk usage breakdown. It is only called when
-// the Disk Usage panel is active, since DiskUsage() queries images,
-// containers, volumes, and build cache in one daemon call and isn't cheap
-// enough to run on every 2s tick.
-func fetchDiskUsageCmd(dc docker.DockerClient) tea.Cmd {
+// fetchDiskUsageCmd fetches the disk usage breakdown and detects leftover
+// resources in parallel. It is only called while Disk Usage or Problems is
+// active, since both queries hit /system/df and aren't cheap enough to run
+// on every 2s tick. scope is the loaded compose project, or nil.
+func fetchDiskUsageCmd(dc docker.DockerClient, scope *docker.ComposeScope) tea.Cmd {
 	return func() tea.Msg {
-		info, err := dc.DiskUsage()
-		return diskUsageMsg{info: info, err: err}
+		var msg diskUsageMsg
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); msg.info, msg.err = dc.DiskUsage() }()
+		go func() { defer wg.Done(); msg.leftovers, msg.leftoversErr = dc.ListLeftovers(scope) }()
+		wg.Wait()
+		return msg
 	}
+}
+
+// fetchDiskUsage is fetchDiskUsageCmd for this model's client and compose scope.
+func (m Model) fetchDiskUsage() tea.Cmd {
+	return fetchDiskUsageCmd(m.docker, m.leftoverScope())
 }

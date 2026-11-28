@@ -30,4 +30,4 @@ Thumbs.db
 .claude/skills/
 
 # leftovers scenario reports (go run ./scenarios/leftovers)
-leftovers-*.json
+/leftovers-*.json

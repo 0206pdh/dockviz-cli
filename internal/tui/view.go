@@ -28,6 +28,8 @@ func (m Model) View() string {
 		return m.renderLogs()
 	case ViewChart:
 		return m.renderChart()
+	case ViewLeftovers:
+		return m.renderLeftovers()
 	default:
 		return m.renderDashboard()
 	}
@@ -67,7 +69,7 @@ func (m Model) renderDashboard() string {
 			rows := diskUsageRows(m.diskUsage)
 			if m.cursor < len(rows) {
 				r := rows[m.cursor]
-				return m.renderConfirmDelete(r.label, "disk usage category", r.warning)
+				return m.renderConfirmDelete(r.label, "disk usage category", pruneWarning(r))
 			}
 		}
 	}
@@ -331,6 +333,17 @@ var diskUsageDefs = []struct {
 		"Truncates container log files. `docker system df` never counts this space.\nContainers are not touched and keep running; logging just starts over from empty."},
 }
 
+// pruneWarning is the confirm-dialog text for a category. Volume prune runs
+// with all=true, so it names the Compose-owned volumes it will also delete.
+func pruneWarning(r diskUsageRow) string {
+	if r.key == "volumes" && r.cat.ComposeUnattached > 0 {
+		return r.warning + fmt.Sprintf(
+			"\n\n%d of these (%s) belong to Compose\nprojects: often data kept after a\n`docker compose down`.\nCheck Leftovers first.",
+			r.cat.ComposeUnattached, docker.FormatSize(r.cat.ComposeUnattachedMB))
+	}
+	return r.warning
+}
+
 // diskUsageRows zips diskUsageDefs with the live breakdown for rendering and key handling.
 func diskUsageRows(du docker.DiskUsageInfo) []diskUsageRow {
 	cats := map[string]docker.DiskUsageCategory{
@@ -388,6 +401,8 @@ func (m Model) renderDiskUsage() string {
 				fmt.Sprintf("unused tagged space outside selected prune: %s", docker.FormatSize(r.cat.OutsidePruneMB))))
 		}
 	}
+
+	rows = append(rows, m.renderLeftoversRow()...)
 
 	if hostRows := renderHostStorage(m.diskUsage); len(hostRows) > 0 {
 		rows = append(rows, "")
@@ -683,7 +698,7 @@ func (m Model) renderFooter() string {
 	case PanelProblems:
 		line2 = "[Enter] inspect  ·  live problem detection"
 	case PanelDiskUsage:
-		line2 = "[d] Prune selected category  ·  0B = measured zero  ·  N/A = unavailable"
+		line2 = "[d] Prune selected category  [Enter] Review leftovers  ·  0B = measured zero  ·  N/A = unavailable"
 	}
 	return "\n" + ui.FooterStyle.Render(line1) + "\n" + ui.FooterStyle.Render(line2)
 }

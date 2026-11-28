@@ -68,10 +68,10 @@ S3 미완료 multipart upload처럼 보이지 않게 남는 Docker 리소스를 
 
 | Phase | ID | 항목 | 효과 |
 |---|---|---|---|
-| 0 | T-023 | Docker context 지원 | Docker Desktop, Colima, OrbStack에서 설정 없이 연결 |
-| 1 | T-024 | 실측 시나리오 (개발자 검증용, Go) | 판정 규칙이 실제 API 필드로 계산되는지 환경별로 확정 |
-| 2 | T-025 | 탐지 로직 (읽기 전용, 순수 함수) | orphan 컨테이너, 빠진 볼륨, 주인 없는 볼륨, 익명 볼륨, 오래 멈춘 컨테이너 판정 |
-| 3 | T-026 | Disk Usage Leftovers 행과 목록 화면 | 판정 이유와 확실도까지 한 화면에서 확인 |
+| 0 | T-023 | Docker context 지원 — 완료 | Docker Desktop, Colima, OrbStack에서 설정 없이 연결 |
+| 1 | T-024 | 실측 시나리오 (개발자 검증용, Go) — 완료 | 판정 규칙이 실제 API 필드로 계산되는지 환경별로 확정 |
+| 2 | T-025 | 탐지 로직 (읽기 전용, 순수 함수) — 완료 | orphan 컨테이너, 빠진 볼륨, 주인 없는 볼륨, 익명 볼륨, 오래 멈춘 컨테이너 판정 |
+| 3 | T-026 | Disk Usage Leftovers 행과 목록 화면 — 완료 | 판정 이유와 확실도까지 한 화면에서 확인 |
 | 4 | T-027 | 개별 삭제 + 통합 테스트(T-007) | 확인창, 삭제 직전 재조회, force 금지. CI에서 실제 daemon 검증 |
 | 5 | T-028 | VM/원격 측정 경로(helper)와 보고 전용 항목 | `local` 로그 드라이버, Docker Desktop 로그 크기, buildx 캐시, 네트워크 주소 풀, overlay2 차이 |
 | 6 | T-029 | 정리 정책 조정 (선택) | 기준 일수 설정, 오탐 반영 |
