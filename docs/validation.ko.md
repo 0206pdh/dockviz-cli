@@ -4,7 +4,8 @@
 stats 조회 시간, 로그 파일 권한)을 실제 Docker 환경에서 확인한 기록과 재현
 방법입니다.
 
-- 기록된 실행은 모두 Windows Docker Desktop WSL2, Docker client/server 28.5.1
+- §1~§8의 실행은 Windows Docker Desktop WSL2, Docker client/server 28.5.1
+  환경입니다. §10 잔존 리소스 실측은 macOS Docker Desktop 4.100.1(Engine 29.9.3)
   환경입니다.
 - 원본 산출물(`artifacts/`)은 `.gitignore` 대상이라 커밋하지 않고, 재현 명령과
   핵심 수치만 이 문서에 남깁니다.
@@ -23,6 +24,7 @@ stats 조회 시간, 로그 파일 권한)을 실제 Docker 환경에서 확인�
 | tagged unused / dangling 구분 | 2.15GB tagged unused는 dangling prune 대상 아님, 1.62GB dangling은 대상 | reclaim |
 | build cache 잔여 | 이미지 삭제 후에도 806.1MB 남음 → Build Cache prune으로 회수 | core-fixes |
 | stats 병렬화 | 컨테이너 12개 `19.730s → 2.058s` (9.585배) | core-fixes |
+| 잔존 리소스 판정 근거 | compose orphan/one-off/빠진 볼륨/내려간 프로젝트 볼륨/익명 볼륨/buildx 캐시를 라벨과 API 필드로 식별 가능. containerd image store에서는 같은 태그 재빌드가 dangling 이미지를 남기지 않음 | leftovers, 2026-11-27 (macOS) |
 | 저장소 압박 + 문제 동시 관측 | 17.18GB volume, CPU 94%, restart 20회를 한 실행에서 확인 | max-safe, 2026-07-29 |
 | CPU/MEM 문제 탐지 | CPU hog, memory pressure/growth, no-limit 컨테이너 재현 | resource-health, 2026-07-30 |
 
@@ -379,3 +381,50 @@ storage/resource/problem 신호를 한 화면에 모으고, 실제로 회수 가
   체크리스트로 따로 확인해야 합니다.
 - 시나리오는 HTTP latency나 RPS를 재는 애플리케이션 벤치마크가 아닙니다.
 - 이 절차들은 수동입니다. 실제 daemon을 쓰는 자동 테스트는 TODOS T-007입니다.
+
+---
+
+## 10. 잔존 리소스 실측 (leftovers)
+
+[leftovers-plan.ko.md](leftovers-plan.ko.md) Phase 1(T-024)의 개발자 검증입니다.
+판정 규칙이 실제 API 필드로 계산되는지 코드 작성 전에 확인합니다.
+
+### 실행 방법
+
+```bash
+go run ./scenarios/leftovers                 # 만들기 → 기록 → 정리
+go run ./scenarios/leftovers --keep          # dockviz로 보기 위해 남겨 두기
+go run ./scenarios/leftovers --cleanup       # --keep으로 남긴 리소스 정리
+```
+
+- dockviz와 같은 규칙으로 daemon을 고릅니다(`--host`, `--context`, 현재 context).
+- 리소스는 `docker` CLI로 만들고 SDK로 조회합니다. 모두 `dockviz.test=leftovers`
+  라벨을 붙이고, 라벨이 없는 익명 볼륨과 buildx 상태 볼륨은 이름으로 추적합니다.
+- 리포트(JSON)에는 판정 질문별 답(`checks`)과 SDK 원본 응답(`snapshot`)이 들어
+  있습니다. `snapshot`은 Phase 2 테스트 fixture로 씁니다.
+- 기본 builder의 build cache는 라벨로 구분할 수 없어 정리하지 않습니다. 실행 후
+  `docker system df`에 수십 MB가 남을 수 있습니다.
+- `docker build`가 base image를 확인할 때 credential helper가 필요합니다. Homebrew
+  `docker` CLI와 Docker Desktop을 함께 쓰면 `docker-credential-desktop`이 PATH에
+  있어야 합니다(`/Applications/Docker.app/Contents/Resources/bin`).
+
+### 2026-11-27, macOS Docker Desktop 4.100.1
+
+환경: Engine 29.9.3, linux/aarch64, containerd image store
+(`io.containerd.snapshotter.v1`), 기본 로그 드라이버 `local`. 23단계 모두 성공,
+라벨 기준 정리 후 남은 컨테이너/볼륨/네트워크/이미지 없음.
+
+| 질문 | 결과 | 판정 규칙에 주는 영향 |
+|---|---|---|
+| 같은 태그 재빌드 시 dangling 이미지 | **생기지 않음.** 라벨 필터, 필터 없는 전체 목록, `dangling=true` 모두 0개 | containerd image store에서는 dangling 이미지 신호가 없음. 이전 이미지의 흔적은 build cache 쪽에 남음(WSL2 classic store에서는 1.62GB dangling 관측, §4) |
+| 멈춘 컨테이너의 종료 시각 | 목록 API는 `State=exited`, `Status="Exited (0) 21 seconds ago"` 문자열뿐. `State.FinishedAt`은 inspect에만 있음 | "오래 멈춘 컨테이너"는 멈춘 컨테이너만 inspect해서 판정 |
+| 익명 볼륨 식별 | 이름이 64자 hex이고 `com.docker.volume.anonymous` 라벨(값 빈 문자열)이 붙음. 3.0MB, refCount 0 | 이름 패턴이 아니라 라벨로 판정 가능 |
+| compose orphan 컨테이너 | 남음. **계속 `running`**. `com.docker.compose.project.config_files` 라벨은 예전 파일(v1)을 가리킴 | 실행 중인 orphan은 삭제 대상이 아니라 안내 대상. config_files 차이는 보조 근거 |
+| compose one-off 컨테이너 | `compose run`(--rm 없음) 후 `com.docker.compose.oneoff=True`, `exited`로 남음 | 라벨로 확실하게 판정 |
+| 파일에서 뺀 볼륨 | project/volume 라벨 유지, 4.0MB. **refCount 1**: 아직 도는 orphan(worker)이 붙잡고 있음 | 빠진 볼륨은 orphan 컨테이너와 묶어서 보여줘야 함. orphan을 지워야 회수 가능 |
+| `compose down`(-v 없음) 후 볼륨 | 남음. project/volume/config-hash/version 라벨, 4.0MB, refCount 0 | "주인 없는 Compose 볼륨" 판정 가능 |
+| 볼륨의 working_dir 라벨 | 없음. 컨테이너에만 `com.docker.compose.project.working_dir`이 있음 | 컨테이너까지 사라진 프로젝트는 디렉터리 존재를 확인할 수 없음 → likely로 분류 |
+| buildx docker-container builder 캐시 | `buildx_buildkit_dvz-leftovers0_state` 볼륨 8.4MB, refCount 1(buildkit 컨테이너가 사용 중). daemon BuildCache에는 기본 builder 기록만 있음 | builder 캐시는 Build Cache가 아니라 "사용 중인 볼륨"으로 보임. 별도 표시 필요 |
+| 네트워크 | 전체 7개(기본 3개 + 생성 4개) | 주소 풀 경고는 개수와 subnet으로 판정 |
+| 로그 드라이버 | 4개 컨테이너 모두 `local`, `LogPath` 모두 빈 값 | 현재 Container Logs는 Docker Desktop에서 측정 불가(Phase 5) |
+

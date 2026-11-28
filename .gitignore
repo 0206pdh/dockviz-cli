@@ -28,3 +28,6 @@ Thumbs.db
 # Claude Code (gstack 바이너리 등 — 새 환경에서 ./setup으로 재설치)
 .claude/settings.local.json
 .claude/skills/
+
+# leftovers scenario reports (go run ./scenarios/leftovers)
+leftovers-*.json
