@@ -14,7 +14,7 @@ daemon으로 확인한 뒤 확정합니다.
 | 리소스 | 생기는 이유 | 확인 결과 | dockviz 현재 상태 |
 |---|---|---|---|
 | 멈춘 컨테이너 | `docker run`에 `--rm`이 없음 | 맞음. `Exited` 상태로 쓰기 레이어와 로그 파일이 남음 | Containers 카테고리 prune으로 처리 |
-| dangling 이미지 | 같은 태그로 다시 build/pull | 맞음. 이전 이미지가 `<none>:<none>`으로 남음. 컨테이너가 쓰는 중이면 prune 대상에서 빠짐. containerd image store에서는 표시가 다를 수 있음(실측 필요) | Images prune으로 처리 |
+| dangling 이미지 | 같은 태그로 다시 build/pull | classic image store에서는 맞음(이전 이미지가 `<none>:<none>`으로 남음). **containerd image store(Docker Desktop 기본)에서는 같은 태그 재빌드가 dangling 이미지를 남기지 않음(2026-11-27 실측)** | Images prune으로 처리 |
 | 익명 볼륨 | Dockerfile `VOLUME`, `-v /path` | 맞음. `docker rm`에 `-v`가 없으면 남음. 단, `docker run --rm`은 익명 볼륨도 함께 지움 | Volumes prune으로 처리 |
 | 빌드 캐시 | BuildKit 캐시 누적 | 맞음. 단, `docker buildx create`로 만든 별도 builder의 캐시는 그 builder의 `buildx_buildkit_*_state` 볼륨에 따로 쌓여 기본 build cache 집계와 `docker builder prune`에서 빠짐 | 기본 builder만 처리 |
 | 네트워크 | compose나 수동으로 만든 bridge | 맞음. 다만 디스크는 거의 차지하지 않음. 실제 문제는 기본 주소 풀 고갈(`could not find an available, non-overlapping IPv4 address pool`) | 없음 |
@@ -55,7 +55,7 @@ daemon으로 확인한 뒤 확정합니다.
 | 경로 | 조건 | 방법 |
 |---|---|---|
 | 직접 | daemon과 같은 파일시스템 (네이티브 Linux) | 지금처럼 파일을 직접 `stat` |
-| helper 컨테이너 | daemon이 VM 안이거나 원격 (Docker Desktop, Colima, 원격 host) | `docker info`의 `DockerRootDir`를 읽기 전용으로 마운트한 짧은 컨테이너를 띄워 크기만 읽고 삭제 |
+| helper 컨테이너 | daemon이 VM 안이거나 원격 (Docker Desktop, 원격 host) | `docker info`의 `DockerRootDir`를 읽기 전용으로 마운트한 짧은 컨테이너를 띄워 크기만 읽고 삭제 |
 
 2026-11-27 Docker Desktop(Mac)에서 `busybox` 컨테이너에 `/var/lib/docker`를
 `:ro`로 마운트해 `containers/`, `volumes/` 크기와 컨테이너별 로그 디렉터리 크기를
@@ -81,13 +81,13 @@ helper 경로의 제약:
 
 | 종류 | 판정 조건 | 확실도 | 삭제 허용 |
 |---|---|---|---|
-| compose orphan 컨테이너 | 컨테이너의 `com.docker.compose.project`가 로드된 Compose 프로젝트와 같고, `com.docker.compose.service`가 현재 services에 없음 | certain (Compose 파일이 있을 때만 판정) | 멈춘 것만. 실행 중이면 안내만 |
+| compose orphan 컨테이너 | 컨테이너의 `com.docker.compose.project`가 로드된 Compose 프로젝트와 같고, `com.docker.compose.service`가 현재 services에 없음 (`com.docker.compose.oneoff=True`는 제외) | certain (Compose 파일이 있을 때만 판정) | 멈춘 것만. 실측에서 orphan은 **계속 실행 중**이었으므로 대부분 안내 대상 |
 | compose one-off 컨테이너 | `com.docker.compose.oneoff=True`이고 멈춤 | certain | 예 |
-| 현재 프로젝트에서 빠진 볼륨 | 볼륨의 project 라벨이 로드된 프로젝트와 같고, `com.docker.compose.volume`이 현재 volumes에 없으며, 연결된 컨테이너 없음 | certain | 예 (데이터 경고 유지) |
+| 현재 프로젝트에서 빠진 볼륨 | 볼륨의 project 라벨이 로드된 프로젝트와 같고, `com.docker.compose.volume`이 현재 volumes에 없음. orphan 컨테이너가 붙잡고 있으면(refCount > 0) 그 orphan과 묶어서 표시 | certain | 연결된 컨테이너가 없을 때만 (데이터 경고 유지) |
 | 주인 없는 Compose 볼륨 | project 라벨이 있지만 그 프로젝트의 컨테이너가 하나도 없음 | likely | 예 (프로젝트 이름, 생성일, 크기를 보여주고 개별 확인) |
-| 익명 볼륨 | 이름이 64자 hex이고 라벨이 없거나 `com.docker.volume.anonymous` 라벨이 있으며 연결된 컨테이너 없음 | certain | 예 |
-| 오래 멈춘 컨테이너 | `Exited`/`Dead`이고 종료 후 N일 경과 (기본값은 결정 필요) | likely | 예 |
-| buildx builder 캐시 | `buildx_buildkit_*_state` 볼륨 크기 | report | 아니오 (`docker buildx prune --builder <name>` 안내) |
+| 익명 볼륨 | `com.docker.volume.anonymous` 라벨이 있고 연결된 컨테이너 없음 (실측: 라벨이 붙음, 이름은 64자 hex) | certain | 예 |
+| 오래 멈춘 컨테이너 | `Exited`/`Dead`이고 inspect의 `State.FinishedAt`으로부터 N일 경과 (목록 API에는 종료 시각이 없어 멈춘 컨테이너만 inspect) | likely | 예 |
+| buildx builder 캐시 | `buildx_buildkit_*_state` 볼륨 크기. buildkit 컨테이너가 사용 중이라 일반 볼륨 판정에서는 "사용 중"으로 보이므로 따로 분류 | report | 아니오 (`docker buildx prune --builder <name>` 안내) |
 | 미사용 네트워크 | 사용자 생성 네트워크 중 연결된 컨테이너 없음 + 전체 개수/주소 풀 사용률 | report | 아니오 (1차) |
 | 추적되지 않는 overlay2 | 로컬 Linux에서 `/var/lib/docker/overlay2` 실제 용량과 API 집계의 차이 | report | 아니오 (영구히 삭제 기능 없음) |
 
@@ -97,7 +97,7 @@ helper 경로의 제약:
 
 진행 순서의 원칙은 세 가지입니다.
 
-1. **연결이 먼저:** Mac의 Docker Desktop, Colima처럼 socket이 기본 위치에 없는
+1. **연결이 먼저:** Mac의 Docker Desktop처럼 socket이 기본 위치에 없는
    환경에서 dockviz가 설정 없이 붙어야 실측도 테스트도 할 수 있습니다.
 2. **API만으로 되는 것이 먼저:** 잔존 리소스 판정의 핵심(orphan 컨테이너, 볼륨)은
    Docker API만으로 계산되므로 로컬/VM/원격 어디서나 같게 동작합니다. 데이터
@@ -133,7 +133,7 @@ context endpoint는 `~/.docker/contexts/meta/<sha256(이름)>/meta.json`의
 `docker/cli` 의존성은 추가하지 않고 직접 파싱합니다. TLS 인증서가 있는 context는
 `contexts/tls/<sha256>/docker/`의 파일을 사용합니다.
 
-**완료 기준:** Mac Docker Desktop, Colima에서 `dockviz`가 플래그나 환경변수 없이
+**완료 기준:** Mac Docker Desktop에서 `dockviz`가 플래그나 환경변수 없이
 연결됨. 우선순위 규칙은 임시 디렉터리를 쓰는 단위 테스트로 고정
 
 ### Phase 1: 실측 시나리오 (T-024)
@@ -154,8 +154,7 @@ context endpoint는 `~/.docker/contexts/meta/<sha256(이름)>/meta.json`의
 
 | 환경 | 이미지 저장소 | 기본 로그 드라이버 | 상태 |
 |---|---|---|---|
-| Docker Desktop (Mac, 4.100.1) | containerd image store | `local` (`LogPath` 빈 값) | 2026-11-27 확인 |
-| Colima (Mac) | 실측 필요 | 실측 필요 | 설치됨 |
+| Docker Desktop (Mac, 4.100.1) | containerd image store | `local` (`LogPath` 빈 값) | **2026-11-27 실행 완료** ([validation §10](validation.ko.md#10-잔존-리소스-실측-leftovers)) |
 | 네이티브 Linux (CI ubuntu) | 실측 필요 | `json-file` 예상 | Phase 4에서 CI로 |
 | Docker Desktop (Windows WSL2) | 기존 검증 환경 | 실측 필요 | 선택 |
 
@@ -206,7 +205,7 @@ context endpoint는 `~/.docker/contexts/meta/<sha256(이름)>/meta.json`의
 
 - 측정 경로 선택: 로컬에서 파일에 접근 가능하면 직접, 아니면 helper 컨테이너.
   helper는 요청 시에만 실행
-- Container Logs 개선: `local` 드라이버(`local-logs/`) 지원, Docker Desktop/Colima에서도
+- Container Logs 개선: `local` 드라이버(`local-logs/`) 지원, Docker Desktop에서도
   크기 측정. 기존 T-004(로그 스트리밍으로 크기 측정)를 대체
 - 로그 정리(`PruneLogs`)는 helper로 하지 않음. VM에서는 지금처럼 "daemon 호스트에서
   정리" 안내 유지

@@ -112,6 +112,26 @@ func clientOpts(ep Endpoint) ([]client.Opt, error) {
 	}, nil
 }
 
+// NewSDKClient returns a raw Docker SDK client for the same endpoint
+// NewClient would pick, without pinging. Validation scenarios and
+// integration tests use it to inspect daemon state that the DockerClient
+// interface does not expose.
+func NewSDKClient(host, dockerContext string) (*client.Client, Endpoint, error) {
+	ep, err := ResolveEndpoint(EndpointOptions{Host: host, Context: dockerContext})
+	if err != nil {
+		return nil, Endpoint{}, err
+	}
+	opts, err := clientOpts(ep)
+	if err != nil {
+		return nil, Endpoint{}, err
+	}
+	cli, err := client.NewClientWithOpts(opts...)
+	if err != nil {
+		return nil, Endpoint{}, fmt.Errorf("failed to create Docker client (%s): %w", ep.Source, err)
+	}
+	return cli, ep, nil
+}
+
 // Endpoint returns how this client's daemon address was chosen.
 func (c *Client) Endpoint() Endpoint { return c.endpoint }
 
