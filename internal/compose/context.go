@@ -27,6 +27,9 @@ type Context struct {
 	WorkingDir  string
 	Files       []string
 	Services    map[string]ServiceContext
+	// Volumes lists the top-level volume keys (e.g. "data"), matching the
+	// com.docker.compose.volume label Compose puts on the volumes it creates.
+	Volumes []string
 }
 
 // ServiceContext describes the service-level blast radius of a running
@@ -89,6 +92,7 @@ func Load(ctx context.Context, workingDir string, paths []string) (*Context, err
 		sc := serviceContext(project, service)
 		out.Services[sc.Name] = sc
 	}
+	out.Volumes = mapKeys(project.Volumes)
 	return out, nil
 }
 

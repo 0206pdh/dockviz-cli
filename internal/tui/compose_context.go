@@ -23,6 +23,26 @@ func (m Model) composeServiceByContainerName(name string) (composectx.ServiceCon
 	return m.composeServiceForContainer(c)
 }
 
+// leftoverScope turns the loaded compose file into the scope leftover
+// detection compares against, or nil when no compose file is loaded.
+func (m Model) leftoverScope() *docker.ComposeScope {
+	if m.composeContext == nil {
+		return nil
+	}
+	scope := &docker.ComposeScope{
+		Project:  m.composeContext.ProjectName,
+		Services: make(map[string]bool, len(m.composeContext.Services)),
+		Volumes:  make(map[string]bool, len(m.composeContext.Volumes)),
+	}
+	for name := range m.composeContext.Services {
+		scope.Services[name] = true
+	}
+	for _, v := range m.composeContext.Volumes {
+		scope.Volumes[v] = true
+	}
+	return scope
+}
+
 func (m Model) composeFilesLabel() string {
 	if m.composeContext == nil || len(m.composeContext.Files) == 0 {
 		return ""

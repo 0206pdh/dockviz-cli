@@ -162,7 +162,7 @@ func (d *DemoClient) DiskUsage() (DiskUsageInfo, error) {
 	info := DiskUsageInfo{
 		Images:     DiskUsageCategory{Label: "Images", Total: 9, Active: 5, SizeMB: 1240, ReclaimMB: 410},
 		Containers: DiskUsageCategory{Label: "Containers", Total: 6, Active: 5, SizeMB: 62, ReclaimMB: 18},
-		Volumes:    DiskUsageCategory{Label: "Local Volumes", Total: 4, Active: 2, SizeMB: 512, ReclaimMB: 96},
+		Volumes:    DiskUsageCategory{Label: "Local Volumes", Total: 4, Active: 2, SizeMB: 512, ReclaimMB: 96, ComposeUnattached: 1, ComposeUnattachedMB: 64},
 		BuildCache: DiskUsageCategory{Label: "Build Cache", Total: 37, Active: 2, SizeMB: 2870, ReclaimMB: 2560},
 		Logs:       DiskUsageCategory{Label: "Container Logs", Total: 6, Active: 5, SizeMB: 734, ReclaimMB: 734},
 		HostStorage: HostStorageInfo{
@@ -188,6 +188,8 @@ func (d *DemoClient) DiskUsage() (DiskUsageInfo, error) {
 		info.Volumes.Total -= 1
 		info.Volumes.SizeMB -= 96
 		info.Volumes.ReclaimMB = 0
+		info.Volumes.ComposeUnattached = 0
+		info.Volumes.ComposeUnattachedMB = 0
 	}
 	if d.buildCachePruned {
 		info.BuildCache.Total -= 30
@@ -236,6 +238,43 @@ func (d *DemoClient) PruneLogs() (float64, error) {
 	time.Sleep(400 * time.Millisecond)
 	d.logsPruned = true
 	return 734, nil
+}
+
+// ListLeftovers runs the real detection rules over fixed demo resources for
+// screenshots. It has no demo-only behavior: like the live client, compose
+// orphans and dropped volumes appear only when a compose scope is given.
+func (d *DemoClient) ListLeftovers(scope *ComposeScope) ([]Leftover, error) {
+	return DetectLeftovers(demoLeftoverInput(scope, time.Now())), nil
+}
+
+func demoLeftoverInput(scope *ComposeScope, now time.Time) LeftoverInput {
+	compose := func(service string, extra map[string]string) map[string]string {
+		l := map[string]string{labelComposeProject: "demo-stack", labelComposeService: service, labelComposeOneOff: "False"}
+		for k, v := range extra {
+			l[k] = v
+		}
+		return l
+	}
+	volume := func(project, key string) map[string]string {
+		return map[string]string{labelComposeProject: project, labelComposeVolume: key}
+	}
+	return LeftoverInput{
+		Now:     now,
+		Compose: scope,
+		Containers: []LeftoverContainer{
+			{ID: "c3d4e5f6a1b2", Name: "postgres-db", State: "running", Labels: compose("postgres", nil), SizeRwMB: 0.1, SizeKnown: true, Volumes: []string{"demo-stack_pgdata"}},
+			{ID: "e1f2a3b4c5d6", Name: "demo-stack-mailer-1", State: "running", Labels: compose("mailer", nil), SizeRwMB: 4, SizeKnown: true, Volumes: []string{"demo-stack_mailqueue"}},
+			{ID: "f7e6d5c4b3a2", Name: "demo-stack-api-run-3f2a9c", State: "exited", Labels: compose("api", map[string]string{labelComposeOneOff: "True"}), FinishedAt: now.Add(-3 * time.Hour), SizeRwMB: 12, SizeKnown: true},
+			{ID: "0a1b2c3d4e5f", Name: "old-benchmark", State: "exited", Labels: map[string]string{}, FinishedAt: now.Add(-41 * 24 * time.Hour), SizeRwMB: 220, SizeKnown: true},
+		},
+		Volumes: []LeftoverVolume{
+			{Name: "demo-stack_pgdata", Labels: volume("demo-stack", "pgdata"), SizeMB: 380, SizeKnown: true, RefCount: 1},
+			{Name: "demo-stack_mailqueue", Labels: volume("demo-stack", "mailqueue"), SizeMB: 64, SizeKnown: true, RefCount: 1},
+			{Name: "legacy-shop_dbdata", Labels: volume("legacy-shop", "dbdata"), SizeMB: 1240, SizeKnown: true, RefCount: 0},
+			{Name: "5f0c8e2d9b7a41c6a3e1d4f2b8c7a9e0d1f3b5c7e9a2d4f6b8c0e2a4c6e8f0a2", Labels: map[string]string{labelAnonymousVol: ""}, SizeMB: 340, SizeKnown: true, RefCount: 0},
+			{Name: "buildx_buildkit_ci-builder0_state", SizeMB: 2150, SizeKnown: true, RefCount: 1},
+		},
+	}
 }
 
 // StreamLogs simulates a live log stream with pre-canned demo lines.

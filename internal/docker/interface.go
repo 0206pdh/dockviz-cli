@@ -27,6 +27,11 @@ type DockerClient interface {
 	PruneVolumes() (freedMB float64, err error)
 	// PruneBuildCache removes unused build cache layers.
 	PruneBuildCache() (freedMB float64, err error)
+	// ListLeftovers detects resources left behind (compose orphans and
+	// one-offs, dropped or ownerless compose volumes, anonymous volumes,
+	// long-stopped containers, buildx builder caches). Read-only. scope is
+	// the loaded compose project, or nil when there is none.
+	ListLeftovers(scope *ComposeScope) ([]Leftover, error)
 	// PruneLogs truncates container log files. Never removes a container.
 	PruneLogs() (freedMB float64, err error)
 	// StreamLogs streams the last 50 lines + live log output for a container.

@@ -163,7 +163,10 @@ context endpoint는 `~/.docker/contexts/meta/<sha256(이름)>/meta.json`의
 **완료 기준:** §2의 판정 조건이 모든 대상 환경에서 API 필드로 계산 가능하다는 근거가 있음.
 환경마다 다른 항목은 판정 규칙에 분기로 반영
 
-### Phase 2: 탐지 로직, 읽기 전용 (T-025)
+### Phase 2: 탐지 로직, 읽기 전용 (T-025) — 완료
+
+구현: `internal/docker/leftovers.go`. 테스트: `leftovers_test.go`(실제 Docker Desktop
+응답 fixture 포함). 실측: [validation §10](validation.ko.md#2026-11-28-phase-2-탐지-로직-실측).
 
 - `internal/docker`에 `Leftover` 타입 추가: 종류, ID, 이름, 크기, 프로젝트, 판정
   이유, 확실도, 삭제 가능 여부
@@ -175,7 +178,10 @@ context endpoint는 `~/.docker/contexts/meta/<sha256(이름)>/meta.json`의
 **완료 기준:** §2의 certain/likely 항목이 단위 테스트로 고정됨. Compose 파일이 없을
 때 Compose 의존 판정이 "판정 불가"로 빠지는 것까지 테스트
 
-### Phase 3: 화면 표시 (T-026)
+### Phase 3: 화면 표시 (T-026) — 완료
+
+구현: `internal/tui/leftovers.go`. 사용법과 판정 의미: [reference.ko.md §4 Leftovers](reference.ko.md#leftovers-잔존-리소스).
+Leftovers는 별도 overlay가 아니라 Disk Usage에서 Enter로 여는 전체 화면(`ViewLeftovers`)입니다.
 
 - Disk Usage에 "Leftovers" 행 추가. Enter로 목록 overlay를 열어 종류, 이름, 크기,
   판정 이유, 확실도를 표시

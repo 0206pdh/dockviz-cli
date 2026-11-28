@@ -49,6 +49,9 @@ networks:
 	if ctx.ProjectName != "shop" {
 		t.Fatalf("ProjectName = %q, want shop", ctx.ProjectName)
 	}
+	if len(ctx.Volumes) != 1 || ctx.Volumes[0] != "data" {
+		t.Fatalf("Volumes = %+v, want [data]", ctx.Volumes)
+	}
 	api := ctx.Services["api"]
 	if api.Name != "api" || api.Image != "my-api:latest" {
 		t.Fatalf("api context = %+v", api)

@@ -74,6 +74,7 @@ critical → warning → info 순으로 정렬합니다.
 | **Idle memory** | CPU + MEM history | CPU p95 ≤ 5%인데 MEM p95 ≥ 512MB |
 | **Noisy neighbor** | project 합산 | 실행 중 2개 이상, project CPU ≥ 50%, 한 컨테이너가 70% 이상 점유 |
 | **Storage offenders** | Disk Usage | 큰 로그, build cache, unused image, stopped-container layer, unattached volume, host-storage gap |
+| **Leftover resources** | Disk Usage → Leftovers | certain/likely 잔존 리소스가 있음. 지울 수 있는 크기 1GB 이상이면 warning ([§4 Leftovers](#leftovers-잔존-리소스)) |
 | **Daemon disconnected** | event | event stream이 끊김. `r`로 재연결 |
 
 ### Severity 기준값
@@ -160,7 +161,7 @@ Docker `system/df` API를 기반으로 하며, `docker system df`가 보여주�
 |---|---|
 | Images | dangling 상태의 태그 없는 이미지 삭제 (`docker image prune`과 같고 `-a`가 아님) |
 | Containers | 중지된 컨테이너 삭제 |
-| Local Volumes | 연결되지 않은 로컬 볼륨 삭제. 이름 있는 볼륨도 포함되므로 애플리케이션 데이터가 지워질 수 있음 |
+| Local Volumes | 연결되지 않은 로컬 볼륨 삭제. 이름 있는 볼륨도 포함되므로 애플리케이션 데이터가 지워질 수 있음. 이 중 Compose 프로젝트 라벨이 붙은 볼륨이 있으면 확인창에 개수와 크기를 따로 표시 |
 | Build Cache | 사용되지 않는 build cache layer 삭제 |
 | Container Logs | 활성 로그를 그 자리에서 truncate하고 rotated 로그 삭제. 컨테이너는 지우지 않음 |
 
@@ -179,6 +180,44 @@ Docker `system/df` API를 기반으로 하며, `docker system df`가 보여주�
 - 행 아래 경고(예: `permission denied on N container(s) — try sudo`): 카테고리
   전체를 측정하지 못한 이유입니다. 조용한 0과 구분하기 위해 표시합니다.
 - 패널이 보이는 동안 10초마다 갱신하며 `r`로 즉시 갱신할 수 있습니다.
+
+### Leftovers (잔존 리소스)
+
+prune 카테고리 아래의 `Leftovers` 행은 평소에 잘 안 보이면서 디스크를 차지하는
+리소스를 모아 보여줍니다. **카테고리 prune이 아니므로 `d`가 동작하지 않고**,
+`Enter`로 항목별 목록을 엽니다. 목록 화면은 읽기 전용이며 아무것도 지우지 않습니다.
+
+열의 의미는 위 카테고리와 같지만 값은 위 카테고리와 겹칩니다(예: 익명 볼륨은
+Local Volumes에도 포함). 그래서 다른 행과 더하지 않습니다.
+
+- `TOTAL`: 찾은 항목 수
+- `ACTIVE`: 지금 지우면 안 되는 항목 수(사용 중이거나 안내만 하는 항목)
+- `SIZE` / `RECLAIMABLE`: 전체 크기 / 지금 지워도 되는 항목의 크기
+
+| 종류 (화면 표시) | 판정 조건 | 확실도 | 지울 수 있을 때 |
+|---|---|---|---|
+| compose orphan | 로드된 Compose 파일에 더 이상 없는 service의 컨테이너 | certain | 멈춰 있을 때만. 실행 중이면 `docker compose up --remove-orphans` 안내 |
+| compose run left | `compose run`을 `--rm` 없이 실행해 남은 컨테이너(`com.docker.compose.oneoff=True`) | certain | 멈춰 있을 때 |
+| dropped volume | 로드된 Compose 프로젝트의 볼륨인데 파일에서 빠진 볼륨 | certain | 붙잡고 있는 컨테이너가 없을 때. 있으면 `Held by`에 표시 |
+| ownerless volume | Compose 프로젝트 라벨이 있는데 그 프로젝트의 컨테이너가 하나도 없는 볼륨 | likely | 붙잡고 있는 컨테이너가 없을 때. 프로젝트를 다시 올릴 거라면 유지 |
+| anonymous volume | `com.docker.volume.anonymous` 라벨이 있고 어떤 컨테이너도 쓰지 않는 볼륨 | certain | 항상 |
+| long-stopped | 멈춘 지 14일 이상 된 컨테이너(inspect의 `State.FinishedAt` 기준) | likely | 항상 |
+| buildx cache | `docker-container` 드라이버 buildx builder의 캐시 볼륨. Build Cache와 `docker builder prune`에 포함되지 않음 | info | dockviz는 지우지 않음. `docker buildx prune --builder <이름>` 안내 |
+
+확실도의 의미:
+
+- **certain**: 라벨로 "주인이 더 이상 원하지 않음"이 증명됩니다.
+- **likely**: 대부분 남은 찌꺼기지만 정상 사용으로도 같은 상태가 됩니다(예: 데이터를
+  남기려고 `-v` 없이 `compose down`).
+- **info**: 알려주기만 하고 dockviz가 지우지 않습니다.
+
+Compose 파일이 로드되지 않으면(현재 디렉터리에 없고 `-f`도 없음) compose orphan과
+dropped volume은 판정하지 않습니다. 현재 프로젝트가 정의한 볼륨은 컨테이너가 없어도
+일부러 남긴 데이터로 보고 보여주지 않습니다. 판정 근거가 된 실측 결과는
+[validation.ko.md §10](validation.ko.md#10-잔존-리소스-실측-leftovers)에 있습니다.
+
+Problems 패널에는 certain/likely 항목이 있을 때 `Leftover resources` 한 줄로
+요약합니다. 지울 수 있는 크기가 1GB 이상이면 warning, 그 밖에는 info입니다.
 
 ### Host Storage (Windows Docker Desktop)
 

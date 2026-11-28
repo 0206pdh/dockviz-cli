@@ -1,0 +1,378 @@
+{
+  "_comment": "Phase 1 (T-024) scenario snapshot, macOS Docker Desktop 4.100.1 / Engine 29.9.3, containerd image store. Raw /system/df containers and volumes plus State from container inspect. Regenerate with: go run ./scenarios/leftovers",
+  "generatedAt": "2026-11-27T05:11:46.192093Z",
+  "environment": {
+    "serverVersion": "29.9.3",
+    "operatingSystem": "Docker Desktop",
+    "storageDriver": "overlayfs",
+    "driverStatus": [
+      [
+        "driver-type",
+        "io.containerd.snapshotter.v1"
+      ]
+    ],
+    "loggingDriver": "local"
+  },
+  "containers": [
+    {
+      "Id": "64830fb3b432e445d0b35c09fb9ecf123f5580b56270fdf88059cc1c28404200",
+      "Names": [
+        "/dvzleft-web-run-7b0da32adb01"
+      ],
+      "Image": "busybox:1.37",
+      "ImageID": "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec",
+      "Command": "echo one-off",
+      "Created": 1795756309,
+      "Ports": [],
+      "SizeRw": 8192,
+      "SizeRootFs": 4276224,
+      "Labels": {
+        "com.docker.compose.config-hash": "532a11b310e98c472465c7ef8764b0dce3118093bea5863d3a8ff3c79ca0c133",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:d82c2ab94640ded77cf76514ce6a84870761105058a4a9e51b05a8a79be97a6c",
+        "com.docker.compose.oneoff": "True",
+        "com.docker.compose.project": "dvzleft",
+        "com.docker.compose.project.config_files": "/private/var/folders/68/fkgtxjq54l399zmf5rl13_r80000gn/T/dvz-leftovers-3792396407/alive-v1.yaml",
+        "com.docker.compose.project.working_dir": "/private/var/folders/68/fkgtxjq54l399zmf5rl13_r80000gn/T/dvz-leftovers-3792396407",
+        "com.docker.compose.service": "web",
+        "com.docker.compose.slug": "7b0da32adb01c56a4b30d5fde489cbc9cfa2b34d9939732a0b29486da64f6cdd",
+        "com.docker.compose.version": "5.7.1",
+        "desktop.docker.io/ports.scheme": "v2",
+        "dockviz.test": "leftovers"
+      },
+      "State": "exited",
+      "Status": "Exited (0) 16 seconds ago",
+      "HostConfig": {
+        "NetworkMode": "dvzleft_default"
+      },
+      "NetworkSettings": {
+        "Networks": {
+          "dvzleft_default": {
+            "IPAMConfig": null,
+            "Links": null,
+            "Aliases": null,
+            "MacAddress": "",
+            "DriverOpts": null,
+            "GwPriority": 0,
+            "NetworkID": "d63bac87f3248721c1641f89afe63cc192afbdc284f997bb32bfb133fdc815e8",
+            "EndpointID": "",
+            "Gateway": "",
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "DNSNames": null
+          }
+        }
+      },
+      "Mounts": [
+        {
+          "Type": "volume",
+          "Name": "dvzleft_data",
+          "Source": "/var/lib/docker/volumes/dvzleft_data/_data",
+          "Destination": "/data",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        }
+      ]
+    },
+    {
+      "Id": "d2ab34d5a3d1593c5c3e23d95d0f2af78788f8f0fba03686aaed4799a23aaf62",
+      "Names": [
+        "/dvzleft-web-1"
+      ],
+      "Image": "busybox:1.37",
+      "ImageID": "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec",
+      "Command": "sh -c 'dd if=/dev/zero of=/data/web bs=1M count=4 2>/dev/null; sleep 3600'",
+      "Created": 1795756309,
+      "Ports": [],
+      "SizeRw": 8192,
+      "SizeRootFs": 4276224,
+      "Labels": {
+        "com.docker.compose.config-hash": "7755eac406f21a439f1d195492550328f931ac967f3a831634bfd2f00cc8b02f",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:d82c2ab94640ded77cf76514ce6a84870761105058a4a9e51b05a8a79be97a6c",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "dvzleft",
+        "com.docker.compose.project.config_files": "/private/var/folders/68/fkgtxjq54l399zmf5rl13_r80000gn/T/dvz-leftovers-3792396407/alive-v1.yaml",
+        "com.docker.compose.project.working_dir": "/private/var/folders/68/fkgtxjq54l399zmf5rl13_r80000gn/T/dvz-leftovers-3792396407",
+        "com.docker.compose.service": "web",
+        "com.docker.compose.version": "5.7.1",
+        "desktop.docker.io/ports.scheme": "v2",
+        "dockviz.test": "leftovers"
+      },
+      "State": "running",
+      "Status": "Up 17 seconds",
+      "HostConfig": {
+        "NetworkMode": "dvzleft_default"
+      },
+      "NetworkSettings": {
+        "Networks": {
+          "dvzleft_default": {
+            "IPAMConfig": null,
+            "Links": null,
+            "Aliases": null,
+            "MacAddress": "6e:67:1d:c5:89:10",
+            "DriverOpts": null,
+            "GwPriority": 0,
+            "NetworkID": "d63bac87f3248721c1641f89afe63cc192afbdc284f997bb32bfb133fdc815e8",
+            "EndpointID": "68bdf6ae553503cea4904878a59f7bf70d733cf70cbbf1717ae07b3182eb46c9",
+            "Gateway": "172.18.0.1",
+            "IPAddress": "172.18.0.3",
+            "IPPrefixLen": 16,
+            "IPv6Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "DNSNames": null
+          }
+        }
+      },
+      "Mounts": [
+        {
+          "Type": "volume",
+          "Name": "dvzleft_data",
+          "Source": "/var/lib/docker/volumes/dvzleft_data/_data",
+          "Destination": "/data",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        }
+      ]
+    },
+    {
+      "Id": "6e580a9988e6f23f46209e12c57cf17613b30e14e38263fdb73c92e26df7249c",
+      "Names": [
+        "/dvzleft-worker-1"
+      ],
+      "Image": "busybox:1.37",
+      "ImageID": "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec",
+      "Command": "sh -c 'dd if=/dev/zero of=/data/worker bs=1M count=4 2>/dev/null; sleep 3600'",
+      "Created": 1795756309,
+      "Ports": [],
+      "SizeRw": 8192,
+      "SizeRootFs": 4276224,
+      "Labels": {
+        "com.docker.compose.config-hash": "758382cd3c3f29cc235da83120b722e3dac3e846f0b9c6554747c4a4990f650d",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:d82c2ab94640ded77cf76514ce6a84870761105058a4a9e51b05a8a79be97a6c",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "dvzleft",
+        "com.docker.compose.project.config_files": "/private/var/folders/68/fkgtxjq54l399zmf5rl13_r80000gn/T/dvz-leftovers-3792396407/alive-v1.yaml",
+        "com.docker.compose.project.working_dir": "/private/var/folders/68/fkgtxjq54l399zmf5rl13_r80000gn/T/dvz-leftovers-3792396407",
+        "com.docker.compose.service": "worker",
+        "com.docker.compose.version": "5.7.1",
+        "desktop.docker.io/ports.scheme": "v2",
+        "dockviz.test": "leftovers"
+      },
+      "State": "running",
+      "Status": "Up 17 seconds",
+      "HostConfig": {
+        "NetworkMode": "dvzleft_default"
+      },
+      "NetworkSettings": {
+        "Networks": {
+          "dvzleft_default": {
+            "IPAMConfig": null,
+            "Links": null,
+            "Aliases": null,
+            "MacAddress": "b6:76:0d:e2:d1:c4",
+            "DriverOpts": null,
+            "GwPriority": 0,
+            "NetworkID": "d63bac87f3248721c1641f89afe63cc192afbdc284f997bb32bfb133fdc815e8",
+            "EndpointID": "0cc271688f48e2a625f5f074a7ba9ec71a94fd7c10f8e820cf86b26ed87cb2bb",
+            "Gateway": "172.18.0.1",
+            "IPAddress": "172.18.0.2",
+            "IPPrefixLen": 16,
+            "IPv6Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "DNSNames": null
+          }
+        }
+      },
+      "Mounts": [
+        {
+          "Type": "volume",
+          "Name": "dvzleft_cache",
+          "Source": "/var/lib/docker/volumes/dvzleft_cache/_data",
+          "Destination": "/data",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        }
+      ]
+    },
+    {
+      "Id": "a8d752acaf6873b6a59fe0228b1202649717498267a7d803b01a63a8bf5ca608",
+      "Names": [
+        "/dvz-leftovers-stopped"
+      ],
+      "Image": "busybox:1.37",
+      "ImageID": "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec",
+      "Command": "sh -c 'echo bye'",
+      "Created": 1795756308,
+      "Ports": [],
+      "SizeRw": 4096,
+      "SizeRootFs": 4272128,
+      "Labels": {
+        "desktop.docker.io/ports.scheme": "v2",
+        "dockviz.test": "leftovers"
+      },
+      "State": "exited",
+      "Status": "Exited (0) 17 seconds ago",
+      "HostConfig": {
+        "NetworkMode": "bridge"
+      },
+      "NetworkSettings": {
+        "Networks": {
+          "bridge": {
+            "IPAMConfig": null,
+            "Links": null,
+            "Aliases": null,
+            "MacAddress": "",
+            "DriverOpts": null,
+            "GwPriority": 0,
+            "NetworkID": "5f17ed833939253fd640c2f268565cbae24188dd44d54aa5b9bbe377dd555963",
+            "EndpointID": "",
+            "Gateway": "",
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "DNSNames": null
+          }
+        }
+      },
+      "Mounts": []
+    }
+  ],
+  "volumes": [
+    {
+      "CreatedAt": "2026-11-27T05:11:59Z",
+      "Driver": "local",
+      "Labels": null,
+      "Mountpoint": "/var/lib/docker/volumes/buildx_buildkit_dvz-leftovers0_state/_data",
+      "Name": "buildx_buildkit_dvz-leftovers0_state",
+      "Options": null,
+      "Scope": "local",
+      "UsageData": {
+        "RefCount": 1,
+        "Size": 8819563
+      }
+    },
+    {
+      "CreatedAt": "2026-11-27T05:11:48Z",
+      "Driver": "local",
+      "Labels": {
+        "com.docker.volume.anonymous": ""
+      },
+      "Mountpoint": "/var/lib/docker/volumes/1da16cfd56658cc3a386a4a4e91bca690285d5202abe43b4d3c3818a7191f12b/_data",
+      "Name": "1da16cfd56658cc3a386a4a4e91bca690285d5202abe43b4d3c3818a7191f12b",
+      "Options": null,
+      "Scope": "local",
+      "UsageData": {
+        "RefCount": 0,
+        "Size": 3145728
+      }
+    },
+    {
+      "CreatedAt": "2026-11-27T05:11:49Z",
+      "Driver": "local",
+      "Labels": {
+        "com.docker.compose.config-hash": "904e85f641b2633bb9da06ba9b9e8b6712d4492b3b725dc2f7ed225808829417",
+        "com.docker.compose.project": "dvzleft",
+        "com.docker.compose.version": "5.7.1",
+        "com.docker.compose.volume": "cache",
+        "dockviz.test": "leftovers"
+      },
+      "Mountpoint": "/var/lib/docker/volumes/dvzleft_cache/_data",
+      "Name": "dvzleft_cache",
+      "Options": null,
+      "Scope": "local",
+      "UsageData": {
+        "RefCount": 1,
+        "Size": 4194304
+      }
+    },
+    {
+      "CreatedAt": "2026-11-27T05:11:49Z",
+      "Driver": "local",
+      "Labels": {
+        "com.docker.compose.config-hash": "dc2d7695f1783d4b87a91cdd5570930585cfeb2fb9124ca632b6b5d0f1ed0d5a",
+        "com.docker.compose.project": "dvzleft",
+        "com.docker.compose.version": "5.7.1",
+        "com.docker.compose.volume": "data",
+        "dockviz.test": "leftovers"
+      },
+      "Mountpoint": "/var/lib/docker/volumes/dvzleft_data/_data",
+      "Name": "dvzleft_data",
+      "Options": null,
+      "Scope": "local",
+      "UsageData": {
+        "RefCount": 2,
+        "Size": 4194304
+      }
+    },
+    {
+      "CreatedAt": "2026-11-27T05:11:50Z",
+      "Driver": "local",
+      "Labels": {
+        "com.docker.compose.config-hash": "9cb72a1b16324cc8b73a598baa4ff47026d9a29260dd5c1ced4418ab8a74d9d8",
+        "com.docker.compose.project": "dvzgone",
+        "com.docker.compose.version": "5.7.1",
+        "com.docker.compose.volume": "dbdata",
+        "dockviz.test": "leftovers"
+      },
+      "Mountpoint": "/var/lib/docker/volumes/dvzgone_dbdata/_data",
+      "Name": "dvzgone_dbdata",
+      "Options": null,
+      "Scope": "local",
+      "UsageData": {
+        "RefCount": 0,
+        "Size": 4194304
+      }
+    }
+  ],
+  "inspects": [
+    {
+      "Id": "64830fb3b432e445d0b35c09fb9ecf123f5580b56270fdf88059cc1c28404200",
+      "Name": "/dvzleft-web-run-7b0da32adb01",
+      "State": {
+        "Status": "exited",
+        "FinishedAt": "2026-11-27T05:11:49.896485004Z"
+      }
+    },
+    {
+      "Id": "d2ab34d5a3d1593c5c3e23d95d0f2af78788f8f0fba03686aaed4799a23aaf62",
+      "Name": "/dvzleft-web-1",
+      "State": {
+        "Status": "running",
+        "FinishedAt": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "Id": "6e580a9988e6f23f46209e12c57cf17613b30e14e38263fdb73c92e26df7249c",
+      "Name": "/dvzleft-worker-1",
+      "State": {
+        "Status": "running",
+        "FinishedAt": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "Id": "a8d752acaf6873b6a59fe0228b1202649717498267a7d803b01a63a8bf5ca608",
+      "Name": "/dvz-leftovers-stopped",
+      "State": {
+        "Status": "exited",
+        "FinishedAt": "2026-11-27T05:11:48.187226212Z"
+      }
+    }
+  ]
+}

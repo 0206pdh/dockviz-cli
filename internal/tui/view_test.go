@@ -75,8 +75,10 @@ func TestRenderDiskUsageShowsHostStorageSeparately(t *testing.T) {
 		}
 	}
 
-	if got := m.activeListLen(); got != 5 {
-		t.Fatalf("activeListLen() = %d, want 5 prunable rows only", got)
+	// Host storage is informational: only the 5 prune rows and the
+	// Leftovers row are selectable.
+	if got := m.activeListLen(); got != 6 {
+		t.Fatalf("activeListLen() = %d, want 5 prunable rows + Leftovers", got)
 	}
 }
 

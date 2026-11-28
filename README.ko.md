@@ -45,7 +45,7 @@ Docker CLI는 개별 명령에는 훌륭합니다. `dockviz`는 여러 리소스
 | Containers | CPU/MEM, compose/project 요약, p95 요약, limit, 상세 정보, 로그, 추이 차트 |
 | Images | 로컬 이미지 태그 조회와 안전한 태그/이미지 삭제 |
 | Problems | OOM/restart event, high CPU, memory pressure/growth, limit 누락, storage offender, daemon 연결 끊김 |
-| Disk Usage | Docker 저장공간 분석과 카테고리별 prune |
+| Disk Usage | Docker 저장공간 분석과 카테고리별 prune, 잔존 리소스(Leftovers) 목록 |
 
 신호 정의, severity 기준값, 각 prune 동작이 실제로 지우는 대상은
 [레퍼런스](docs/reference.ko.md)에 정리되어 있습니다.
@@ -160,7 +160,7 @@ Compose context는 read-only이며 영향 범위를 설명하는 데 씁니다.
 | `q` / `Ctrl+C` | 종료 |
 | `Tab` | Containers, Images, Problems, Disk Usage 전환 |
 | `↑` / `k`, `↓` / `j` | 목록 이동 |
-| `Enter` | 컨테이너 상세(Containers) 또는 문제 상세(Problems) |
+| `Enter` | 컨테이너 상세(Containers), 문제 상세(Problems), 잔존 리소스 목록(Disk Usage의 Leftovers 행) |
 | `Esc` | 뒤로 가기 / overlay 닫기 |
 | `d` | 컨테이너/이미지 삭제 또는 선택한 디스크 카테고리 prune |
 | `l` | 선택한 컨테이너의 실시간 로그 |

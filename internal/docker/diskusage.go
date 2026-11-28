@@ -29,6 +29,12 @@ type DiskUsageCategory struct {
 	// OutsidePruneMB is known unused space that the selected safe prune action
 	// intentionally does not remove. It is currently used for tagged images.
 	OutsidePruneMB float64
+	// ComposeUnattached / ComposeUnattachedMB count reclaimable volumes that
+	// carry a Compose project label (Local Volumes only). Volume prune runs
+	// with all=true, so these — often data kept on purpose after
+	// `compose down` — are deleted too; the confirm dialog says so.
+	ComposeUnattached   int
+	ComposeUnattachedMB float64
 	// Unavailable, when non-empty, explains why this category couldn't be
 	// fully measured (e.g. filesystem permission denied) so the TUI can
 	// show that instead of a misleadingly clean 0.
@@ -108,6 +114,10 @@ func (c *Client) DiskUsage() (DiskUsageInfo, error) {
 			info.Volumes.Active++
 		} else {
 			info.Volumes.ReclaimMB += bytesToMB(size)
+			if v.Labels[labelComposeProject] != "" {
+				info.Volumes.ComposeUnattached++
+				info.Volumes.ComposeUnattachedMB += bytesToMB(size)
+			}
 		}
 	}
 	if unknownVolumeCount > 0 {
