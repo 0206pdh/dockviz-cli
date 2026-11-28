@@ -32,6 +32,10 @@ type DockerClient interface {
 	// long-stopped containers, buildx builder caches). Read-only. scope is
 	// the loaded compose project, or nil when there is none.
 	ListLeftovers(scope *ComposeScope) ([]Leftover, error)
+	// RemoveLeftover removes one listed leftover after re-checking it is
+	// still detected and removable; never forces. Returns the size measured
+	// before removal.
+	RemoveLeftover(l Leftover, scope *ComposeScope) (freedMB float64, err error)
 	// PruneLogs truncates container log files. Never removes a container.
 	PruneLogs() (freedMB float64, err error)
 	// StreamLogs streams the last 50 lines + live log output for a container.

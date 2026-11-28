@@ -97,6 +97,8 @@ func (m Model) renderConfirmDelete(name, kind, subText string) string {
 		kindLabel = "Tag"
 	case "disk usage category":
 		kindLabel = "Prune"
+	case "leftover":
+		kindLabel = "Remove"
 	}
 
 	title := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorRed).Render("  ⚠  Confirm Delete")

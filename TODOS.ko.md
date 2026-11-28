@@ -22,7 +22,7 @@ dockviz의 고도화 로드맵과 남은 작업입니다. 2026-11-26, v0.8.0 기
 
 | ID | 항목 | 효과 |
 |---|---|---|
-| T-007 | `Client` 실제 daemon 통합 테스트 (CI ubuntu) | volume prune 같은 회수량 버그를 머지 전에 잡음 |
+| T-007 | `Client` 실제 daemon 통합 테스트 (CI ubuntu) — 기반 완료(잔존 리소스), prune 수치는 남음 | volume prune 같은 회수량 버그를 머지 전에 잡음 |
 | T-006 | context를 받는 `DockerClient` | 종료·화면 전환 시 진행 중 호출 취소, prune/remove에도 제한 |
 | T-009 | stats 동시 조회 수 제한 + 마지막 정상값 유지 | 컨테이너 수십 개에서도 daemon burst 방지, 빈 값 대신 직전 값 표시 |
 | T-010 | event 기반 즉시 갱신 | `die`/`oom`/`kill` 도착 시 바로 조회해 2초 대기 없이 반영 |
@@ -72,7 +72,7 @@ S3 미완료 multipart upload처럼 보이지 않게 남는 Docker 리소스를 
 | 1 | T-024 | 실측 시나리오 (개발자 검증용, Go) — 완료 | 판정 규칙이 실제 API 필드로 계산되는지 환경별로 확정 |
 | 2 | T-025 | 탐지 로직 (읽기 전용, 순수 함수) — 완료 | orphan 컨테이너, 빠진 볼륨, 주인 없는 볼륨, 익명 볼륨, 오래 멈춘 컨테이너 판정 |
 | 3 | T-026 | Disk Usage Leftovers 행과 목록 화면 — 완료 | 판정 이유와 확실도까지 한 화면에서 확인 |
-| 4 | T-027 | 개별 삭제 + 통합 테스트(T-007) | 확인창, 삭제 직전 재조회, force 금지. CI에서 실제 daemon 검증 |
+| 4 | T-027 | 개별 삭제 + 통합 테스트(T-007) — 완료 | 확인창, 삭제 직전 재조회, force 금지. CI에서 실제 daemon 검증 |
 | 5 | T-028 | VM/원격 측정 경로(helper)와 보고 전용 항목 | `local` 로그 드라이버, Docker Desktop 로그 크기, buildx 캐시, 네트워크 주소 풀, overlay2 차이 |
 | 6 | T-029 | 정리 정책 조정 (선택) | 기준 일수 설정, 오탐 반영 |
 
@@ -133,6 +133,10 @@ unavailable입니다. `ContainerLogs`를 스트리밍해 바이트를 세면 어
 context를 넘기고 종료 시 남은 작업을 취소합니다.
 
 ### T-007: `Client` 실제 daemon 통합 테스트
+
+> 기반 완료: `internal/docker/integration_test.go`와 CI `integration` job이 잔존 리소스
+> 탐지·삭제를 실제 daemon에서 검증합니다. 아래의 prune 수치 검증은 같은 틀에 추가하면
+> 됩니다.
 
 build tag나 `DOCKVIZ_INTEGRATION=1`로 켜는 테스트를 만들고, 라벨을 붙인
 컨테이너/볼륨/이미지로 `DiskUsage`와 `Prune*` 수치를 확인한 뒤 정리합니다. Docker가

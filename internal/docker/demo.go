@@ -15,6 +15,9 @@ type DemoClient struct {
 
 	// pruned* flags let PruneX calls visibly shrink the DiskUsage() breakdown
 	// on the next fetch, so the demo prune flow looks real.
+	// removedLeftovers hides leftovers removed in the demo by ID.
+	removedLeftovers map[string]bool
+
 	imagesPruned     bool
 	containersPruned bool
 	volumesPruned    bool
@@ -244,7 +247,37 @@ func (d *DemoClient) PruneLogs() (float64, error) {
 // screenshots. It has no demo-only behavior: like the live client, compose
 // orphans and dropped volumes appear only when a compose scope is given.
 func (d *DemoClient) ListLeftovers(scope *ComposeScope) ([]Leftover, error) {
-	return DetectLeftovers(demoLeftoverInput(scope, time.Now())), nil
+	in := demoLeftoverInput(scope, time.Now())
+	var cs []LeftoverContainer
+	for _, c := range in.Containers {
+		if !d.removedLeftovers[c.ID] {
+			cs = append(cs, c)
+		}
+	}
+	var vs []LeftoverVolume
+	for _, v := range in.Volumes {
+		if !d.removedLeftovers[v.Name] {
+			vs = append(vs, v)
+		}
+	}
+	in.Containers, in.Volumes = cs, vs
+	return DetectLeftovers(in), nil
+}
+
+// RemoveLeftover applies the same re-check as the live client, then hides
+// the resource from later listings.
+func (d *DemoClient) RemoveLeftover(l Leftover, scope *ComposeScope) (float64, error) {
+	current, _ := d.ListLeftovers(scope)
+	target, err := CheckRemovable(l, current)
+	if err != nil {
+		return 0, err
+	}
+	time.Sleep(300 * time.Millisecond)
+	if d.removedLeftovers == nil {
+		d.removedLeftovers = map[string]bool{}
+	}
+	d.removedLeftovers[target.ID] = true
+	return target.SizeMB, nil
 }
 
 func demoLeftoverInput(scope *ComposeScope, now time.Time) LeftoverInput {

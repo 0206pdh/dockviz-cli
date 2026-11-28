@@ -457,8 +457,9 @@ go run . --demo
 |---|---|
 | `internal/docker/containers_test.go` | CPU delta, OnlineCPUs fallback, zero system delta, 포트 포맷/중복 제거 |
 | `internal/docker/endpoint_test.go` | daemon endpoint 우선순위(`--context`/`--host`/`DOCKER_HOST`/`DOCKER_CONTEXT`/현재 context), context 디렉터리 해시, TLS 파일, 잘못된 설정 오류, context가 `DOCKER_HOST`에 덮이지 않음 |
-| `internal/docker/leftovers_test.go` | 잔존 리소스 판정: 실제 Docker Desktop 응답(`testdata/leftovers-desktop-4.100.1.json`) 기반 판정, Compose 파일 유무, 규칙별 경계(실행 중 one-off, 다른 프로젝트, 붙어 있는 볼륨, 기준 일수), 정렬, buildx 이름, demo 데이터 |
-| `internal/tui/leftovers_test.go` | Leftovers 행/목록 화면 렌더링, Enter/Esc/이동/`d` 처리, 데이터 반영과 실패 시 이전 목록 유지, Problems 요약, Compose 볼륨 prune 경고, compose scope 변환 |
+| `internal/docker/leftovers_test.go` | 삭제 직전 재확인(`CheckRemovable`), 잔존 리소스 판정: 실제 Docker Desktop 응답(`testdata/leftovers-desktop-4.100.1.json`) 기반 판정, Compose 파일 유무, 규칙별 경계(실행 중 one-off, 다른 프로젝트, 붙어 있는 볼륨, 기준 일수), 정렬, buildx 이름, demo 데이터 |
+| `internal/tui/leftovers_test.go` | Leftovers 행/목록 화면 렌더링, Enter/Esc/이동/`d` 처리, 개별 삭제 흐름(거부, 확인/취소, 진행 중 중복 방지, 결과/오류 표시), 데이터 반영과 실패 시 이전 목록 유지, Problems 요약, Compose 볼륨 prune 경고, compose scope 변환 |
+| `internal/docker/integration_test.go` | (`DOCKVIZ_INTEGRATION=1`) 실제 daemon에서 잔존 리소스 5종 생성 → 탐지 → 붙잡힌 볼륨 삭제 거부 → 순서대로 삭제 → 중복 삭제 거부 → 남은 것 없음, 현재 프로젝트 리소스 보존 |
 | `internal/docker/diskusage_test.go` | dangling 판정, 크기 변환/포맷, 로컬 host 판정, VHDX 경로, 로그 파일 크기, demo prune |
 | `internal/compose/context_test.go` | Compose 해석, 의존성/역의존성, 지정 파일 없음, 자동 탐색 실패 |
 | `internal/tui/problems_test.go` | event/리소스/project/storage 판정 |
@@ -475,14 +476,18 @@ go run . --demo
 |---|---|
 | lint | gofmt 검사, `go mod tidy` diff 검사, `go vet` (linux/windows/darwin) |
 | test | ubuntu/macOS/Windows에서 `go build`, `go test` (ubuntu는 `-race`) |
+| integration | ubuntu runner의 Docker Engine에서 `DOCKVIZ_INTEGRATION=1`로 실제 daemon 통합 테스트 |
 
 Dependabot(`.github/dependabot.yml`)이 Go 모듈과 GitHub Actions 버전을 매주
 확인합니다.
 
 ### 실제 daemon 검증
 
-실제 `Client` 메서드는 단위 테스트로 거의 다루지 못합니다(TODOS T-007). 대신
-[`scenarios/`](scenarios/)의 PowerShell 시나리오가 라벨된 컨테이너·볼륨·이미지를
+`internal/docker/integration_test.go`는 `DOCKVIZ_INTEGRATION=1`일 때만 실행되는
+실제 daemon 테스트입니다. 잔존 리소스를 `docker` CLI로 만들고 `ListLeftovers`와
+`RemoveLeftover`로 탐지·삭제한 뒤 남은 것이 없는지 확인합니다. CI integration job과
+로컬 Docker Desktop에서 같은 테스트를 돌립니다. 그 밖의 `Client` 메서드는
+[`scenarios/`](scenarios/)의 시나리오가 라벨된 컨테이너·볼륨·이미지를
 만들어 실제 daemon에서 수치를 기록하고, 결과는
 [docs/validation.ko.md](docs/validation.ko.md)에 남깁니다.
 

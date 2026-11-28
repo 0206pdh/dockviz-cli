@@ -150,6 +150,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pruneResultMsg = fmt.Sprintf("%s: freed %s", categoryLabel(msg.category), docker.FormatSize(msg.freedMB))
 		return m, m.fetchDiskUsage()
 
+	case leftoverRemovedMsg:
+		m.leftoverRemoving = false
+		if msg.err != nil {
+			m.leftoverNote = fmt.Sprintf("%s was not removed: %v", msg.leftover.Name, msg.err)
+			m.leftoverNoteErr = true
+		} else {
+			m.leftoverNote = fmt.Sprintf("removed %s · freed ~%s (measured before removal)", msg.leftover.Name, docker.FormatSize(msg.freedMB))
+			m.leftoverNoteErr = false
+		}
+		return m, m.fetchDiskUsage()
+
 	// Keyboard input
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -224,9 +235,35 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// --- Leftovers view key handling (read-only list) ---
+	// --- Leftovers view key handling ---
 	if m.activeView == ViewLeftovers {
+		if m.confirmLeftover {
+			switch msg.String() {
+			case "y", "Y":
+				m.confirmLeftover = false
+				m.leftoverRemoving = true
+				m.leftoverNote = ""
+				return m, removeLeftoverCmd(m.docker, m.pendingLeftover, m.leftoverScope())
+			case "n", "N", "esc":
+				m.confirmLeftover = false
+				m.pendingLeftover = docker.Leftover{}
+			}
+			return m, nil
+		}
 		switch {
+		case keyMatches(msg, km.Delete):
+			if m.leftoverRemoving || len(m.leftovers) == 0 {
+				return m, nil
+			}
+			l := m.leftovers[clamp(m.leftoverCursor, 0, len(m.leftovers)-1)]
+			if !l.Removable {
+				m.leftoverNote = fmt.Sprintf("%s cannot be removed now: %s", l.Name, l.Action)
+				m.leftoverNoteErr = true
+				return m, nil
+			}
+			// Capture the item now so a refresh cannot change the target.
+			m.pendingLeftover = l
+			m.confirmLeftover = true
 		case keyMatches(msg, km.Quit):
 			if m.logCancel != nil {
 				m.logCancel()
@@ -435,6 +472,14 @@ func removeImageCmd(dc docker.DockerClient, id string, seq uint64) tea.Cmd {
 			return dataMsg{seq: seq, err: err}
 		}
 		return fetchDataCmd(dc, seq)()
+	}
+}
+
+// removeLeftoverCmd removes one leftover; the client re-checks it first.
+func removeLeftoverCmd(dc docker.DockerClient, l docker.Leftover, scope *docker.ComposeScope) tea.Cmd {
+	return func() tea.Msg {
+		freed, err := dc.RemoveLeftover(l, scope)
+		return leftoverRemovedMsg{leftover: l, freedMB: freed, err: err}
 	}
 }
 

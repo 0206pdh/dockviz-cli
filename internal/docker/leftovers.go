@@ -10,6 +10,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -454,4 +455,63 @@ func (c *Client) containerFinishedAt(id string) (time.Time, bool) {
 	}
 	t := parseFinishedAt(insp.State.FinishedAt)
 	return t, !t.IsZero()
+}
+
+// ErrLeftoverChanged means the resource is no longer detected the same way
+// as when it was listed, so removal was refused.
+var ErrLeftoverChanged = errors.New("leftover changed since it was listed")
+
+// CheckRemovable re-validates a listed leftover against a fresh detection
+// result: same kind and ID, and still removable. It is pure so the guard can
+// be tested without a daemon.
+func CheckRemovable(listed Leftover, current []Leftover) (Leftover, error) {
+	if listed.Kind == LeftoverBuilderCache {
+		return Leftover{}, fmt.Errorf("%s is info only; dockviz does not remove buildx caches", listed.Name)
+	}
+	for _, l := range current {
+		if l.Kind != listed.Kind || l.ID != listed.ID {
+			continue
+		}
+		if !l.Removable {
+			return Leftover{}, fmt.Errorf("%w: %s is no longer removable (%s)", ErrLeftoverChanged, l.Name, l.Action)
+		}
+		return l, nil
+	}
+	return Leftover{}, fmt.Errorf("%w: %s is no longer detected", ErrLeftoverChanged, listed.Name)
+}
+
+// RemoveLeftover removes one leftover. It re-runs detection first and
+// refuses if the resource changed (CheckRemovable), and never forces:
+// a container is removed only when stopped, a volume only when unattached,
+// so the daemon itself rejects anything that started being used meanwhile.
+// The returned size is the one measured before removal; the remove APIs do
+// not report reclaimed bytes.
+func (c *Client) RemoveLeftover(listed Leftover, scope *ComposeScope) (float64, error) {
+	if listed.Kind == LeftoverBuilderCache {
+		_, err := CheckRemovable(listed, nil) // refuses without a daemon call
+		return 0, err
+	}
+	current, err := c.ListLeftovers(scope)
+	if err != nil {
+		return 0, fmt.Errorf("re-check before removal failed: %w", err)
+	}
+	target, err := CheckRemovable(listed, current)
+	if err != nil {
+		return 0, err
+	}
+
+	switch target.Kind {
+	case LeftoverComposeOrphan, LeftoverComposeOneOff, LeftoverStoppedContainer:
+		// Anonymous volumes of the container are kept (no -v); they show up
+		// as their own leftovers so their data is never deleted unseen.
+		err = c.cli.ContainerRemove(c.ctx, target.ID, container.RemoveOptions{Force: false, RemoveVolumes: false})
+	case LeftoverDroppedVolume, LeftoverOwnerlessVolume, LeftoverAnonymousVolume:
+		err = c.cli.VolumeRemove(c.ctx, target.ID, false)
+	default:
+		return 0, fmt.Errorf("removing %s is not supported", target.Kind)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return target.SizeMB, nil
 }

@@ -458,3 +458,18 @@ Leftovers 목록, Local Volumes prune 확인창을 렌더링해 확인했습니�
   (`dvzgone_dbdata`)
 - `--cleanup` 후 라벨 기준 컨테이너/볼륨/네트워크 0개
 
+### 2026-11-28, Phase 4 개별 삭제 통합 테스트
+
+`DOCKVIZ_INTEGRATION=1 go test -run Integration -count=1 -v ./internal/docker/`
+(macOS Docker Desktop 4.100.1에서 12.3초 통과, CI ubuntu `integration` job에서도 실행).
+
+1. compose orphan(멈춤), one-off, dropped volume, ownerless volume, 익명 볼륨을 만듦
+   (익명 볼륨은 `docker create -v /data` → `docker rm`. 이 방식에도
+   `com.docker.volume.anonymous` 라벨이 붙음)
+2. 탐지: 5종 모두 검출. dropped volume은 멈춘 orphan이 붙잡고 있어 삭제 불가로 판정
+3. 붙잡힌 dropped volume 삭제 시도 → `ErrLeftoverChanged`로 거부, 볼륨 그대로
+4. one-off, orphan 삭제 → 다시 탐지하면 dropped volume이 삭제 가능으로 바뀜
+5. dropped/ownerless/익명 볼륨 삭제. 반환 크기 = 삭제 전 측정값
+6. 같은 항목 재삭제 → `ErrLeftoverChanged`로 거부
+7. 이 실행의 잔존 리소스 0개, 현재 프로젝트의 `*_data` 볼륨과 실행 중 `web`은 그대로
+

@@ -144,8 +144,12 @@ func leftoverSize(l docker.Leftover) string {
 // renderLeftovers is the full-screen, read-only Leftovers list.
 func (m Model) renderLeftovers() string {
 	gray := lipgloss.NewStyle().Foreground(ui.ColorGray)
+	if m.confirmLeftover {
+		return m.renderConfirmDelete(m.pendingLeftover.Name, "leftover", leftoverRemovalWarning(m.pendingLeftover))
+	}
+
 	title := ui.TitleStyle.Render("  dockviz  ") +
-		ui.FooterStyle.Render("  Leftovers  •  read-only: nothing is removed from this screen")
+		ui.FooterStyle.Render("  Leftovers  •  [d] removes one item at a time, re-checked first and never forced")
 
 	scopeLine := "no compose file loaded: orphan and dropped-volume checks are off (run in the project dir or pass -f)"
 	if m.composeContext != nil {
@@ -186,7 +190,16 @@ func (m Model) renderLeftovers() string {
 		lines = append(lines, "", m.renderLeftoverDetail(m.leftovers[clamp(m.leftoverCursor, 0, len(m.leftovers)-1)]))
 	}
 
-	footer := ui.FooterStyle.Render("[↑↓] Navigate  [r] Refresh  [Esc] Back  [q] Quit  ·  certain = labels prove it · likely = check first · info = never removed")
+	switch {
+	case m.leftoverRemoving:
+		lines = append(lines, "", "  "+lipgloss.NewStyle().Foreground(ui.ColorYellow).Render("↻ Removing..."))
+	case m.leftoverNote != "" && m.leftoverNoteErr:
+		lines = append(lines, "", "  "+ui.ErrorStyle.Render("⚠ "+m.leftoverNote))
+	case m.leftoverNote != "":
+		lines = append(lines, "", "  "+lipgloss.NewStyle().Foreground(ui.ColorGreen).Render("✓ "+m.leftoverNote))
+	}
+
+	footer := ui.FooterStyle.Render("[↑↓] Navigate  [d] Remove selected  [r] Refresh  [Esc] Back  [q] Quit  ·  certain = labels prove it · likely = check first · info = never removed")
 	return strings.Join(lines, "\n") + "\n\n" + footer
 }
 
@@ -267,4 +280,18 @@ func (m Model) leftoverProblems(now time.Time) []Problem {
 		Recommendation: "Open Disk Usage, select Leftovers and press Enter to review each item with its reason and suggested action. Nothing is removed automatically.",
 		Since:          now,
 	}}
+}
+
+// leftoverRemovalWarning is the confirm-dialog text for removing one item.
+func leftoverRemovalWarning(l docker.Leftover) string {
+	size := leftoverSize(l)
+	var what string
+	switch l.Kind {
+	case docker.LeftoverDroppedVolume, docker.LeftoverOwnerlessVolume, docker.LeftoverAnonymousVolume:
+		what = "Permanently deletes this volume and the data in it."
+	default:
+		what = "Removes this stopped container (not forced).\nIts anonymous volumes are kept and listed\nas leftovers of their own."
+	}
+	return fmt.Sprintf("%s\n%s\n\nSize measured before removal: %s.\nRe-checked right before removal; refused\nif it changed or started being used.",
+		leftoverKindLabel(l.Kind)+": "+l.Reason, what, size)
 }
