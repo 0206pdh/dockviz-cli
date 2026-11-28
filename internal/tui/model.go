@@ -71,6 +71,13 @@ type diskUsageMsg struct {
 // 2-second container stats refresh.
 type diskUsageRefreshMsg struct{}
 
+// leftoverRemovedMsg reports the result of removing one leftover.
+type leftoverRemovedMsg struct {
+	leftover docker.Leftover
+	freedMB  float64
+	err      error
+}
+
 // pruneDoneMsg is sent after a prune action (images/containers/volumes/build
 // cache) completes.
 type pruneDoneMsg struct {
@@ -108,6 +115,12 @@ type Model struct {
 	leftoversLoaded bool
 	leftoversErr    error
 	leftoverCursor  int
+	// Removing one leftover from the Leftovers view.
+	confirmLeftover  bool            // confirm dialog visible
+	pendingLeftover  docker.Leftover // item captured when [d] was pressed
+	leftoverRemoving bool            // removal in flight
+	leftoverNote     string          // result or refusal shown under the list
+	leftoverNoteErr  bool
 
 	// Navigation
 	activePanel Panel

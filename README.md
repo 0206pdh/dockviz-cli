@@ -165,7 +165,7 @@ Compose context is read-only and is used to explain impact:
 | `↑` / `k`, `↓` / `j` | Move up / down |
 | `Enter` | Open container detail (Containers), problem detail (Problems), or the leftovers list (Leftovers row in Disk Usage) |
 | `Esc` | Go back or close an overlay |
-| `d` | Delete selected container/image, or prune the selected disk category |
+| `d` | Delete selected container/image, prune the selected disk category, or remove the selected leftover (Leftovers list) |
 | `l` | Open live logs for the selected container |
 | `r` | Refresh data and reconnect the event stream if needed |
 | `g` | Open the CPU/MEM history chart |
@@ -224,7 +224,8 @@ go run . --demo
 
 CI (`.github/workflows/ci.yml`) runs gofmt, `go vet` for Linux/Windows/macOS,
 and `go build`/`go test` on all three OSes for every pull request and push to
-`main`.
+`main`, plus real-daemon integration tests on ubuntu
+(`DOCKVIZ_INTEGRATION=1 go test -run Integration ./internal/docker/`).
 
 ```text
 main.go

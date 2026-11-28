@@ -2,6 +2,7 @@ package docker
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"reflect"
 	"sort"
@@ -333,5 +334,70 @@ func TestDemoClientListLeftoversCoversEveryKind(t *testing.T) {
 		if !seen[k] {
 			t.Errorf("demo leftovers missing kind %s", k)
 		}
+	}
+}
+
+func TestCheckRemovable(t *testing.T) {
+	listed := Leftover{Kind: LeftoverOwnerlessVolume, ID: "gone_db", Name: "gone_db", Removable: true, SizeMB: 10}
+
+	if got, err := CheckRemovable(listed, []Leftover{listed}); err != nil || got.ID != "gone_db" {
+		t.Fatalf("unchanged removable item: got %+v err %v", got, err)
+	}
+
+	// The same volume is now attached (e.g. the project came back up).
+	held := listed
+	held.Removable = false
+	held.Action = "still used"
+	if _, err := CheckRemovable(listed, []Leftover{held}); !errors.Is(err, ErrLeftoverChanged) {
+		t.Fatalf("attached since listing: err = %v, want ErrLeftoverChanged", err)
+	}
+
+	// Gone, or re-classified under another kind with the same ID.
+	if _, err := CheckRemovable(listed, nil); !errors.Is(err, ErrLeftoverChanged) {
+		t.Fatalf("no longer detected: err = %v", err)
+	}
+	other := listed
+	other.Kind = LeftoverDroppedVolume
+	if _, err := CheckRemovable(listed, []Leftover{other}); !errors.Is(err, ErrLeftoverChanged) {
+		t.Fatalf("kind changed: err = %v", err)
+	}
+
+	cache := Leftover{Kind: LeftoverBuilderCache, ID: "buildx_buildkit_b0_state", Name: "b"}
+	if _, err := CheckRemovable(cache, []Leftover{cache}); err == nil || errors.Is(err, ErrLeftoverChanged) {
+		t.Fatalf("buildx cache must be refused as info-only, err = %v", err)
+	}
+}
+
+func TestDemoClientRemoveLeftover(t *testing.T) {
+	d := NewDemoClient()
+	before, _ := d.ListLeftovers(nil)
+	var target, held Leftover
+	for _, l := range before {
+		if l.Kind == LeftoverAnonymousVolume {
+			target = l
+		}
+	}
+	if _, err := d.RemoveLeftover(target, nil); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := d.ListLeftovers(nil)
+	for _, l := range after {
+		if l.ID == target.ID {
+			t.Fatal("removed demo leftover still listed")
+		}
+	}
+	if _, err := d.RemoveLeftover(target, nil); !errors.Is(err, ErrLeftoverChanged) {
+		t.Fatalf("second removal: err = %v, want ErrLeftoverChanged", err)
+	}
+
+	scope := &ComposeScope{Project: "demo-stack", Services: map[string]bool{"postgres": true}, Volumes: map[string]bool{"pgdata": true}}
+	ls, _ := d.ListLeftovers(scope)
+	for _, l := range ls {
+		if l.Kind == LeftoverDroppedVolume {
+			held = l
+		}
+	}
+	if _, err := d.RemoveLeftover(held, scope); err == nil {
+		t.Fatal("volume held by a running orphan must not be removable")
 	}
 }

@@ -192,7 +192,14 @@ Leftovers는 별도 overlay가 아니라 Disk Usage에서 Enter로 여는 전체
 **완료 기준:** `--demo`에서 모든 종류가 보이고, view 테스트로 화면이 고정됨.
 `scenarios/leftovers --keep` 후 실제 daemon에서 같은 목록이 보임
 
-### Phase 4: 개별 삭제 + 통합 테스트 (T-027, T-007)
+### Phase 4: 개별 삭제 + 통합 테스트 (T-027, T-007) — 완료
+
+구현: `Client.RemoveLeftover`, `CheckRemovable`(`internal/docker/leftovers.go`), Leftovers
+화면의 `d`(`internal/tui`). 통합 테스트: `internal/docker/integration_test.go`, CI
+`integration` job. **일괄 삭제는 넣지 않았습니다.** 개별 삭제를 써 본 뒤 필요하면
+certain 항목에 한해 검토합니다(§4). 시나리오 코드를 패키지로 빼서 재사용하는 대신,
+통합 테스트가 필요한 리소스만 직접 만듭니다(`go run` 시나리오와 `go test`의 수명과
+정리 방식이 달라서).
 
 - 목록에서 한 항목씩 `d`로 삭제, 확인창 필수. 일괄 삭제는 certain 항목에만 허용할지
   이 단계에서 결정
@@ -234,6 +241,6 @@ Leftovers는 별도 overlay가 아니라 Disk Usage에서 Enter로 여는 전체
 |---|---|---|
 | 오래 멈춘 컨테이너 기준 | 7일 / 14일 / 30일 | 14일 |
 | 주인 없는 Compose 볼륨 | likely로 보여주기 / 아예 제외 | likely로 보여주되 일괄 삭제에서 제외 |
-| 일괄 삭제 | 허용 안 함 / certain만 허용 | Phase 4에서 개별 삭제를 먼저 써 보고 결정 |
+| 일괄 삭제 | 허용 안 함 / certain만 허용 | **Phase 4 결정: 넣지 않음.** 개별 삭제를 써 본 뒤 재검토 |
 | 기존 Volumes prune(`all=true`) | 유지 / 익명 볼륨만으로 축소 | 유지하고 경고만 구체화 (기존 검증 결과와 동작을 바꾸지 않음) |
 | helper 이미지 | `busybox` 고정 태그 / 사용자 지정 | `busybox` 고정 태그, `--helper-image`로 변경 가능 |

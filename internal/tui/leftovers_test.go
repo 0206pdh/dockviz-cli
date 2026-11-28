@@ -147,7 +147,7 @@ func TestRenderLeftoversView(t *testing.T) {
 
 	view := m.View()
 	for _, want := range []string{
-		"read-only", "no compose file loaded",
+		"removes one item at a time", "[d] Remove selected", "no compose file loaded",
 		"dropped volume", "held by dvzleft-worker-1",
 		"anonymous volume", "removable",
 		"compose orphan", "in use",
@@ -277,9 +277,11 @@ func TestLeftoverScopeFromComposeContext(t *testing.T) {
 // interface panics if anything else is used.
 type fakeDiskClient struct {
 	docker.DockerClient
-	gotScope *docker.ComposeScope
-	duErr    error
-	leftErr  error
+	gotScope  *docker.ComposeScope
+	duErr     error
+	leftErr   error
+	removeErr error
+	removed   []docker.Leftover
 }
 
 func (f *fakeDiskClient) DiskUsage() (docker.DiskUsageInfo, error) {
@@ -292,6 +294,111 @@ func (f *fakeDiskClient) ListLeftovers(scope *docker.ComposeScope) ([]docker.Lef
 		return nil, f.leftErr
 	}
 	return sampleLeftovers(), nil
+}
+
+func (f *fakeDiskClient) RemoveLeftover(l docker.Leftover, scope *docker.ComposeScope) (float64, error) {
+	f.removed = append(f.removed, l)
+	f.gotScope = scope
+	if f.removeErr != nil {
+		return 0, f.removeErr
+	}
+	return l.SizeMB, nil
+}
+
+func leftoverViewModel(dc docker.DockerClient) Model {
+	m := leftoverModel()
+	m.docker = dc
+	m.activeView = ViewLeftovers
+	return m
+}
+
+func TestRemoveLeftoverRefusesNonRemovable(t *testing.T) {
+	m := leftoverViewModel(&fakeDiskClient{})
+	m.leftoverCursor = 0 // dropped volume held by the orphan
+	m = press(t, m, "d")
+	if m.confirmLeftover {
+		t.Fatal("confirm opened for a held volume")
+	}
+	if !m.leftoverNoteErr || !strings.Contains(m.leftoverNote, "cannot be removed now") {
+		t.Fatalf("note = %q", m.leftoverNote)
+	}
+	if !strings.Contains(m.renderLeftovers(), "cannot be removed now") {
+		t.Fatal("refusal not shown in the view")
+	}
+}
+
+func TestRemoveLeftoverConfirmCancel(t *testing.T) {
+	m := leftoverViewModel(&fakeDiskClient{})
+	m.leftoverCursor = 1 // anonymous volume, removable
+	m = press(t, m, "d")
+	if !m.confirmLeftover || m.pendingLeftover.ID != "85de3eb1585d" {
+		t.Fatalf("confirm=%v pending=%+v", m.confirmLeftover, m.pendingLeftover)
+	}
+	view := m.View()
+	for _, want := range []string{"Remove:", "Permanently deletes", "measured before removal", "Re-checked"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("confirm dialog missing %q:\n%s", want, view)
+		}
+	}
+	m = press(t, m, "n")
+	if m.confirmLeftover || m.leftoverRemoving {
+		t.Fatal("cancel did not close the dialog")
+	}
+
+	// A container removal explains that its anonymous volumes are kept.
+	m.leftoverCursor = 0
+	m.leftovers = []docker.Leftover{{Kind: docker.LeftoverComposeOneOff, Name: "shop-api-run-1", ID: "abc", Removable: true, SizeKnown: true}}
+	m = press(t, m, "d")
+	if !strings.Contains(m.View(), "anonymous volumes are kept") {
+		t.Errorf("container confirm missing volume note:\n%s", m.View())
+	}
+}
+
+func TestRemoveLeftoverConfirmRunsRemoval(t *testing.T) {
+	fc := &fakeDiskClient{}
+	m := leftoverViewModel(fc)
+	m.composeContext = &composectx.Context{ProjectName: "dvzleft"}
+	m.leftoverCursor = 3 // ownerless volume
+	m = press(t, m, "d")
+
+	updated, cmd := m.Update(keyMsg("y"))
+	m = updated.(Model)
+	if !m.leftoverRemoving || cmd == nil {
+		t.Fatalf("y should start removal (removing=%v cmd=%v)", m.leftoverRemoving, cmd)
+	}
+	if v := m.renderLeftovers(); !strings.Contains(v, "Removing") {
+		t.Errorf("in-flight state not shown:\n%s", v)
+	}
+	// [d] is ignored while a removal is in flight.
+	if again := press(t, m, "d"); again.confirmLeftover {
+		t.Fatal("second removal started while one is in flight")
+	}
+
+	msg := cmd().(leftoverRemovedMsg)
+	if len(fc.removed) != 1 || fc.removed[0].ID != "dvzgone_dbdata" || fc.gotScope == nil || fc.gotScope.Project != "dvzleft" {
+		t.Fatalf("removed=%+v scope=%+v", fc.removed, fc.gotScope)
+	}
+
+	updated, cmd = m.Update(msg)
+	m = updated.(Model)
+	if m.leftoverRemoving || m.leftoverNoteErr || !strings.Contains(m.leftoverNote, "removed dvzgone_dbdata · freed ~4 MB (measured before removal)") {
+		t.Fatalf("note = %q err=%v", m.leftoverNote, m.leftoverNoteErr)
+	}
+	if cmd == nil {
+		t.Fatal("successful removal should refresh disk usage and leftovers")
+	}
+}
+
+func TestRemoveLeftoverErrorIsShown(t *testing.T) {
+	m := leftoverViewModel(&fakeDiskClient{})
+	updated, _ := m.Update(leftoverRemovedMsg{
+		leftover: docker.Leftover{Name: "dvzgone_dbdata"},
+		err:      errors.New("leftover changed since it was listed: dvzgone_dbdata is no longer removable"),
+	})
+	m = updated.(Model)
+	if !m.leftoverNoteErr || !strings.Contains(m.renderLeftovers(), "was not removed: leftover changed") {
+		t.Fatalf("error not shown: %q", m.leftoverNote)
+	}
 }
 
 func TestFetchDiskUsageCmdIncludesLeftovers(t *testing.T) {

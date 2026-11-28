@@ -2,8 +2,9 @@
 #
 # release.yml publishes whatever is tagged, so this workflow is the gate that
 # keeps broken commits from reaching a tag (release.yml re-runs the same tests
-# on the tagged commit). Only pure-logic unit tests run here; real-daemon
-# validation is manual for now (docs/validation.ko.md, TODOS.ko.md T-007).
+# on the tagged commit). The test matrix runs pure-logic unit tests; the
+# integration job runs real-daemon tests against the runner's Docker Engine
+# (DOCKVIZ_INTEGRATION=1, internal/docker/integration_test.go, T-007).
 name: CI
 
 on:
@@ -73,3 +74,23 @@ jobs:
       - name: Test
         if: runner.os != 'Linux'
         run: go test ./...
+
+  integration:
+    name: Integration (real Docker daemon)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Docker versions
+        run: |
+          docker version
+          docker compose version
+
+      - name: Integration tests
+        env:
+          DOCKVIZ_INTEGRATION: "1"
+        run: go test -run Integration -count=1 -v ./internal/docker/

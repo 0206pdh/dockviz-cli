@@ -162,7 +162,7 @@ Compose context는 read-only이며 영향 범위를 설명하는 데 씁니다.
 | `↑` / `k`, `↓` / `j` | 목록 이동 |
 | `Enter` | 컨테이너 상세(Containers), 문제 상세(Problems), 잔존 리소스 목록(Disk Usage의 Leftovers 행) |
 | `Esc` | 뒤로 가기 / overlay 닫기 |
-| `d` | 컨테이너/이미지 삭제 또는 선택한 디스크 카테고리 prune |
+| `d` | 컨테이너/이미지 삭제, 선택한 디스크 카테고리 prune, 선택한 잔존 리소스 삭제(Leftovers 목록) |
 | `l` | 선택한 컨테이너의 실시간 로그 |
 | `r` | 새로고침, 필요하면 event stream 재연결 |
 | `g` | CPU/MEM 추이 차트 |
@@ -224,7 +224,8 @@ go run . --demo
 ```
 
 CI(`.github/workflows/ci.yml`)는 모든 PR과 `main` push에서 gofmt, Linux/Windows/macOS
-대상 `go vet`, 세 OS의 `go build`/`go test`를 실행합니다.
+대상 `go vet`, 세 OS의 `go build`/`go test`, ubuntu의 실제 daemon 통합 테스트
+(`DOCKVIZ_INTEGRATION=1 go test -run Integration ./internal/docker/`)를 실행합니다.
 
 ```text
 main.go
